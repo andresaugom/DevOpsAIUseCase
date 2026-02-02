@@ -83,6 +83,94 @@ python --version
 gcloud auth list
 ```
 
+### 4. Configure Terraform
+
+Before running your first benchmark, you need to configure Terraform with your cloud provider credentials and settings.
+
+#### Minimum Terraform Configuration (GCP)
+
+1. **Navigate to Terraform directory:**
+   ```bash
+   cd terraform/gcp
+   ```
+
+2. **Initialize Terraform:**
+   ```bash
+   terraform init
+   ```
+   
+   This command:
+   - Downloads required provider plugins (Google Cloud provider)
+   - Initializes the backend for state management
+   - Prepares the working directory for Terraform operations
+
+3. **Create configuration file:**
+   ```bash
+   cp terraform.tfvars.example terraform.tfvars
+   ```
+
+4. **Edit `terraform.tfvars` with your settings:**
+   ```hcl
+   # Required: Your GCP project ID
+   project_id = "your-project-id"
+   
+   # Required: Region and zone for the cluster
+   region = "us-central1"
+   zone   = "us-central1-a"
+   
+   # Required: Machine type for benchmark nodes
+   machine_type = "n2-standard-4"
+   
+   # Required: CPU vendor (intel, amd, or arm)
+   cpu_vendor = "intel"
+   
+   # Optional: CPU generation for documentation
+   cpu_generation = "Ice Lake"
+   
+   # Optional: Number of nodes (default: 3)
+   node_count = 3
+   
+   # Optional: Cluster name (default: benchmark-cluster)
+   cluster_name = "benchmark-cluster"
+   ```
+
+5. **Validate configuration:**
+   ```bash
+   terraform validate
+   ```
+
+6. **Preview changes:**
+   ```bash
+   terraform plan
+   ```
+
+**Important Notes:**
+- **First-time setup**: The `terraform init` command must be run before any other Terraform commands
+- **State file**: Terraform creates a `terraform.tfstate` file to track your infrastructure. Keep this file secure and do not delete it while resources exist
+- **Backend configuration**: For production use, consider configuring a remote backend (GCS bucket) for state management
+- **Authentication**: Ensure `GOOGLE_APPLICATION_CREDENTIALS` environment variable is set and points to a valid service account key
+
+#### Common Terraform Configuration Issues
+
+**Issue: "Error: Could not load plugin"**
+- **Solution**: Run `terraform init` to download required plugins
+
+**Issue: "Error: Missing required argument"**
+- **Solution**: Ensure all required variables are set in `terraform.tfvars`
+
+**Issue: "Error: could not find default credentials"**
+- **Solution**: Set up GCP authentication:
+  ```bash
+  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+  gcloud auth application-default login
+  ```
+
+**Issue: "Error: Insufficient permissions"**
+- **Solution**: Ensure your service account has the following roles:
+  - `roles/container.admin` (GKE management)
+  - `roles/compute.admin` (Compute resources)
+  - `roles/iam.serviceAccountUser` (Service account usage)
+
 ## Running Your First Benchmark
 
 ### Quick Start (Recommended)

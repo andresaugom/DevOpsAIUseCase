@@ -319,6 +319,73 @@ def get_benchmark_history(days: int = 30):
     return sorted(results, key=lambda x: x["timestamp"], reverse=True)
 ```
 
+### 4. Grafana AI Agent Integration
+
+**Overview:**
+Since the benchmarking pipeline already uses Grafana for visualization and monitoring, integrating with Grafana's built-in AI capabilities provides an additional layer of operational intelligence. Grafana Cloud includes a context-aware LLM agent that can provide insights, fix dashboards, and potentially make changes to your monitoring stack.
+
+**Key Capabilities:**
+- **Context-Aware Insights**: The Grafana AI agent understands your dashboard context and can provide real-time insights about your metrics
+- **Dashboard Assistance**: Help with creating, troubleshooting, and optimizing Grafana dashboards
+- **Query Optimization**: Suggest improvements to PromQL queries for better performance
+- **Anomaly Explanation**: Provide natural language explanations of metric anomalies directly in Grafana
+- **Future Extensibility**: While we won't use stack modification features initially, the agent supports making infrastructure changes for future use cases
+
+**Integration Benefits:**
+- **Unified Interface**: Operators already using Grafana for visualization can access AI insights without switching tools
+- **Contextual Analysis**: The AI agent has direct access to dashboard context, metrics, and visualizations
+- **Reduced Complexity**: Leverages existing Grafana infrastructure rather than building separate AI interfaces
+- **Complementary Approach**: Works alongside our custom AI agent for specialized benchmarking analysis
+
+**Implementation Approach:**
+1. **Grafana Cloud Setup**: Use Grafana Cloud instance (required for AI agent features)
+2. **Dashboard Integration**: Configure dashboards with AI-enabled panels for inline insights
+3. **Custom AI Agent Coordination**: Our Python-based AI agent handles benchmark-specific analysis while Grafana AI handles real-time dashboard queries
+4. **Read-Only Mode**: Configure Grafana AI agent with read-only permissions initially to ensure safety
+
+**Access Method:**
+- Grafana Cloud web interface
+- Grafana AI assistant directly in dashboards
+- API access for programmatic interaction (if needed)
+
+**Use Cases:**
+- "Explain why this metric spiked" - directly from dashboard
+- "Optimize this PromQL query for performance"
+- "Create a new panel showing CPU efficiency over time"
+- "What correlations exist between memory and CPU metrics?"
+
+**Example Workflow:**
+```
+1. Operator views benchmark dashboard in Grafana
+   ↓
+2. Notices anomaly in CPU utilization panel
+   ↓
+3. Clicks Grafana AI assistant button
+   ↓
+4. Asks: "Why did CPU usage spike at 14:00?"
+   ↓
+5. Grafana AI analyzes:
+   - Dashboard context
+   - Related metrics
+   - Recent events
+   ↓
+6. Provides inline explanation with suggested actions
+   ↓
+7. For deeper analysis, operator can consult custom AI agent
+```
+
+**Considerations:**
+- **Cost**: Grafana Cloud AI features may have additional costs
+- **Data Privacy**: Ensure metrics data handling complies with privacy requirements
+- **Feature Availability**: AI features are available in Grafana Cloud but may not be available in self-hosted instances
+- **Complementary Tools**: Use Grafana AI for real-time dashboard assistance, custom AI agent for historical benchmark analysis
+
+**Future Enhancements:**
+- Enable controlled stack modifications through Grafana AI for automated remediation
+- Integrate custom AI agent findings into Grafana dashboards via annotations
+- Use Grafana AI suggestions to improve custom AI agent's recommendations
+- Create feedback loop between both AI systems for continuous improvement
+
 ---
 
 ## User Interface
