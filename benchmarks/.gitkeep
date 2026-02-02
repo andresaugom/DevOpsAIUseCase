@@ -1,0 +1,10 @@
+# Example benchmark artifact placeholder
+# This directory will contain JSON and CSV files from benchmark runs
+
+# Example file naming:
+# - gcp-intel-20260201-143022.json
+# - gcp-intel-20260201-143022.csv
+# - gcp-amd-20260201-150530.json
+# - gcp-amd-20260201-150530.csv
+
+README.md

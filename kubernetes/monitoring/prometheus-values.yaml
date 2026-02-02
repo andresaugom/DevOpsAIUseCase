@@ -1,0 +1,105 @@
+# Prometheus Stack Helm Values
+# Custom values for deploying kube-prometheus-stack
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  
+  prometheusSpec:
+    # Storage configuration
+    retention: 15d
+    retentionSize: "50GB"
+    
+    # Resource limits
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+    
+    # Storage
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    
+    # Scrape interval for benchmark metrics
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    
+    # Service monitors - automatically discover services
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    
+    # Additional scrape configs for custom targets
+    additionalScrapeConfigs: []
+
+# Grafana configuration
+grafana:
+  enabled: true
+  
+  # Admin credentials (change in production)
+  adminPassword: "admin"
+  
+  # Persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+  
+  # Service type - use LoadBalancer for external access
+  service:
+    type: LoadBalancer
+  
+  # Grafana dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  
+  # Data sources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus-operated:9090
+          access: proxy
+          isDefault: true
+
+# Alertmanager - optional for production
+alertmanager:
+  enabled: false
+
+# Node exporter - collect node-level metrics
+nodeExporter:
+  enabled: true
+
+# Kube state metrics - collect Kubernetes metrics
+kubeStateMetrics:
+  enabled: true
+
+# Prometheus operator
+prometheusOperator:
+  enabled: true
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 200Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi

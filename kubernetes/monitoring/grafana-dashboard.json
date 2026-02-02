@@ -1,0 +1,187 @@
+{
+  "dashboard": {
+    "title": "Online Boutique Benchmark Dashboard",
+    "tags": ["benchmark", "online-boutique", "performance"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "title": "CPU Usage by Service",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=\"default\", container!=\"\", container!=\"POD\"}[5m]) * 100",
+            "legendFormat": "{{container}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU Usage"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Memory Usage by Service",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "container_memory_working_set_bytes{namespace=\"default\", container!=\"\", container!=\"POD\"} / 1024 / 1024",
+            "legendFormat": "{{container}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "mbytes", "label": "Memory"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "CPU Throttling by Service",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_cfs_throttled_seconds_total{namespace=\"default\", container!=\"\", container!=\"POD\"}[5m])",
+            "legendFormat": "{{container}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Throttled Seconds/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Pod Restart Count",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "kube_pod_container_status_restarts_total{namespace=\"default\"}",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Restarts"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Request Rate (RPS)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"default\"}[5m]))",
+            "legendFormat": "Total RPS",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Node CPU Utilization",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "Node CPU %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU Usage"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Current Pod Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "count(kube_pod_status_phase{namespace=\"default\", phase=\"Running\"})",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "fieldOptions": {
+            "calcs": ["lastNotNull"],
+            "values": false
+          }
+        }
+      },
+      {
+        "title": "Average CPU Utilization",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+        "targets": [
+          {
+            "expr": "avg(rate(container_cpu_usage_seconds_total{namespace=\"default\", container!=\"\", container!=\"POD\"}[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "fieldOptions": {
+            "calcs": ["mean"],
+            "values": false,
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "title": "Average Memory Usage",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "avg(container_memory_working_set_bytes{namespace=\"default\", container!=\"\", container!=\"POD\"}) / 1024 / 1024",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "fieldOptions": {
+            "calcs": ["mean"],
+            "values": false,
+            "unit": "mbytes"
+          }
+        }
+      },
+      {
+        "title": "P95 Latency",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace=\"default\"}[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "fieldOptions": {
+            "calcs": ["mean"],
+            "values": false,
+            "unit": "s"
+          }
+        }
+      }
+    ]
+  }
+}

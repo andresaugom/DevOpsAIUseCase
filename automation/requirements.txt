@@ -1,0 +1,33 @@
+# Python Requirements
+# Dependencies for the benchmark automation pipeline
+
+# HTTP requests for Prometheus API
+requests>=2.31.0
+
+# YAML parsing for configuration
+PyYAML>=6.0
+
+# Command-line argument parsing (built-in, but listed for completeness)
+# argparse
+
+# JSON handling (built-in)
+# json
+
+# Subprocess management (built-in)
+# subprocess
+
+# Testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code quality
+pylint>=2.17.0
+black>=23.7.0
+flake8>=6.1.0
+
+# Type checking
+mypy>=1.5.0
+
+# For future AI agent development (optional, not used in base automation)
+# openai>=1.0.0
+# langchain>=0.1.0
