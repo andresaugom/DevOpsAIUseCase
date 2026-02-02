@@ -1,0 +1,11 @@
+# Example Terraform variables file for GCP
+# Copy this file to terraform.tfvars and fill in your values
+
+project_id     = "your-gcp-project-id"
+region         = "us-central1"
+zone           = "us-central1-a"
+cluster_name   = "benchmark-cluster"
+machine_type   = "n2-standard-4"
+node_count     = 3
+cpu_vendor     = "intel"
+cpu_generation = "Ice Lake"
