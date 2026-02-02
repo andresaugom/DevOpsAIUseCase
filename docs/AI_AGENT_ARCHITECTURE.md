@@ -377,7 +377,7 @@ Since the benchmarking pipeline already uses Grafana for visualization and monit
 **Considerations:**
 - **Cost**: Grafana Cloud AI features may have additional costs
 - **Data Privacy**: Ensure metrics data handling complies with privacy requirements
-- **Feature Availability**: AI features available in Grafana Cloud, may not be available in self-hosted instances
+- **Feature Availability**: AI features are available in Grafana Cloud but may not be available in self-hosted instances
 - **Complementary Tools**: Use Grafana AI for real-time dashboard assistance, custom AI agent for historical benchmark analysis
 
 **Future Enhancements:**
