@@ -2,14 +2,14 @@
 # Supports GCP (implemented), AWS, and Azure (future)
 
 # Use Python 3.11 slim base image for smaller size
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TERRAFORM_VERSION=1.7.5 \
-    HELM_VERSION=3.14.2 \
+    HELM_VERSION=3.15.4 \
     KUBECTL_VERSION=1.29.2
 
 # Install system dependencies
@@ -32,10 +32,12 @@ RUN wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraf
     terraform --version
 
 # Install Helm
-RUN wget -q https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz && \
-    tar -zxf helm-v${HELM_VERSION}-linux-amd64.tar.gz && \
-    mv linux-amd64/helm /usr/local/bin/ && \
-    rm -rf linux-amd64 helm-v${HELM_VERSION}-linux-amd64.tar.gz && \
+RUN curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | tee /usr/share/keyrings/helm.gpg > /dev/null && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | \
+    tee /etc/apt/sources.list.d/helm-stable-debian.list && \
+    apt-get update && \
+    apt-get install -y helm && \
+    rm -rf /var/lib/apt/lists/* && \
     helm version
 
 # Install kubectl

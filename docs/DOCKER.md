@@ -46,6 +46,14 @@ Build the Docker image from the Dockerfile:
 docker build -t devops-benchmark:latest .
 ```
 
+> **Note**: The Docker build requires internet access to download Terraform, Helm, kubectl, and cloud CLIs. If you're building in a restricted environment, the build may fail. Ensure you have access to:
+> - `releases.hashicorp.com` (Terraform)
+> - `baltocdn.com` (Helm)
+> - `dl.k8s.io` (kubectl)
+> - `packages.cloud.google.com` (Google Cloud SDK)
+> - `awscli.amazonaws.com` (AWS CLI)
+> - `aka.ms` (Azure CLI)
+
 ### Multi-architecture Build (Optional)
 
 For multi-platform support (AMD64/ARM64):
