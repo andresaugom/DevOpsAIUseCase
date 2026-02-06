@@ -90,7 +90,7 @@ temp/
 docs/_build/
 site/
 
-# Docker files themselves
+# Docker files themselves (not needed in image - these are for building/managing the container from host)
 Dockerfile
 .dockerignore
 docker-compose.yml
