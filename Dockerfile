@@ -9,7 +9,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TERRAFORM_VERSION=1.7.5 \
-    HELM_VERSION=3.15.4 \
     KUBECTL_VERSION=1.29.2
 
 # Install system dependencies

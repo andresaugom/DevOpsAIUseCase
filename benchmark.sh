@@ -260,7 +260,8 @@ main() {
         "-e" "AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}"
     )
     
-    if [ -n "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+    # Only set GOOGLE_APPLICATION_CREDENTIALS if file exists and was mounted
+    if [ -n "${GOOGLE_APPLICATION_CREDENTIALS}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
         env_vars+=("-e" "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}")
     fi
     

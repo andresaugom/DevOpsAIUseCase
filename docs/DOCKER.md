@@ -639,7 +639,7 @@ docker build --progress=plain -t devops-benchmark:latest .
 |-----------|---------|---------|
 | Python | 3.11 | Automation scripts |
 | Terraform | 1.7.5 | Infrastructure provisioning |
-| Helm | 3.x (Latest Stable) | Kubernetes package manager |
+| Helm | 3.x (from apt) | Kubernetes package manager |
 | kubectl | 1.29.2 | Kubernetes CLI |
 | Google Cloud SDK | Latest | GCP CLI and authentication |
 | AWS CLI | v2 | AWS CLI (future support) |
