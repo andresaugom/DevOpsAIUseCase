@@ -1,0 +1,105 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+.venv/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+
+# Credentials (IMPORTANT: never include credentials in image)
+*.pem
+*.key
+*-key.json
+credentials.json
+service-account*.json
+.config/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Benchmark output (should be mounted as volume, not baked into image)
+benchmarks/*.json
+benchmarks/*.csv
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation build artifacts
+docs/_build/
+site/
+
+# Docker files themselves
+Dockerfile
+.dockerignore
+docker-compose.yml
+benchmark.sh
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# OS specific
+Thumbs.db

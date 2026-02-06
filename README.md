@@ -1,5 +1,50 @@
 # Online Boutique Cloud‑Agnostic Benchmarking Pipeline
 
+## 🐳 Docker Quick Start
+
+**New!** The entire pipeline is now containerized for easy deployment without manual dependency installation.
+
+### Run a Benchmark in 3 Steps
+
+```bash
+# 1. Set your GCP project ID
+export GCP_PROJECT_ID="your-project-id"
+
+# 2. Build the Docker image
+docker build -t devops-benchmark:latest .
+
+# 3. Run a benchmark (uses your gcloud credentials)
+docker run -it --rm \
+  -v ~/.config/gcloud:/root/.config/gcloud:ro \
+  -v $(pwd)/benchmarks:/workspace/benchmarks \
+  -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \
+  devops-benchmark:latest \
+  --cloud gcp \
+  --machine-type n2-standard-4 \
+  --duration 600 \
+  --cleanup
+```
+
+**Or use the convenience script:**
+
+```bash
+./benchmark.sh gcp n2-standard-4 600 --build --cleanup
+```
+
+**What's included in the Docker image:**
+- ✅ Python 3.11
+- ✅ Terraform 1.7.5
+- ✅ Helm 3.14.2
+- ✅ kubectl 1.29.2
+- ✅ Google Cloud SDK (gcloud)
+- ✅ AWS CLI v2 (for future support)
+- ✅ Azure CLI (for future support)
+- ✅ All Python dependencies
+
+📖 **Full Docker documentation**: [docs/DOCKER.md](docs/DOCKER.md)
+
+---
+
 ## 1. Objective and Scope
 
 ### Objective
