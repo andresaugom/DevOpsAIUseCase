@@ -1,5 +1,47 @@
 # Quick Reference Card
 
+## 🐳 Docker Commands (Recommended)
+
+### Build Docker Image
+```bash
+docker build -t devops-benchmark:latest .
+```
+
+### Run Benchmark with Docker
+```bash
+# Using wrapper script (easiest)
+export GCP_PROJECT_ID="your-project-id"
+./benchmark.sh gcp n2-standard-4 600 --cleanup
+
+# Using Docker directly
+docker run -it --rm \
+  -v ~/.config/gcloud:/root/.config/gcloud:ro \
+  -v $(pwd)/benchmarks:/workspace/benchmarks \
+  -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \
+  devops-benchmark:latest \
+  --cloud gcp --machine-type n2-standard-4 --duration 600 --cleanup
+```
+
+### Docker Compose
+```bash
+docker-compose build
+docker-compose run --rm devops-benchmark --cloud gcp --machine-type n2-standard-4 --duration 600
+```
+
+### Docker Shell (Debugging)
+```bash
+./benchmark.sh gcp n2-standard-4 600 --shell
+# or
+docker run -it --rm \
+  -v ~/.config/gcloud:/root/.config/gcloud:ro \
+  -v $(pwd)/benchmarks:/workspace/benchmarks \
+  -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \
+  devops-benchmark:latest \
+  /bin/bash
+```
+
+---
+
 ## Essential Commands
 
 ### Run a Complete Benchmark
@@ -218,6 +260,9 @@ python main.py --cloud gcp --cleanup-only
 | Python logs | Console output |
 | Kubernetes configs | `~/.kube/config` |
 | Cloud credentials | `~/.config/gcloud/` (GCP) |
+| **Docker files** | `Dockerfile`, `.dockerignore`, `docker-compose.yml` |
+| **Docker wrapper** | `benchmark.sh` |
+| **Docker docs** | `docs/DOCKER.md` |
 
 ### Metrics Reference
 
@@ -234,6 +279,7 @@ python main.py --cloud gcp --cleanup-only
 
 | Topic | File |
 |-------|------|
+| **Docker Usage** | `docs/DOCKER.md` |
 | Quick Start | `docs/GETTING_STARTED.md` |
 | Architecture | `docs/ARCHITECTURE.md` |
 | AI Agent Design | `docs/AI_AGENT_ARCHITECTURE.md` |

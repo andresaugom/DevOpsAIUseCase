@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  devops-benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devops-benchmark:latest
+    container_name: devops-benchmark
+    
+    # Interactive mode for CLI usage
+    stdin_open: true
+    tty: true
+    
+    # Environment variables for cloud authentication
+    environment:
+      # GCP
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-/root/.config/gcloud/application_default_credentials.json}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      
+      # AWS (future support)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
+      
+      # Azure (future support)
+      - AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+    
+    # Volume mounts
+    volumes:
+      # GCP credentials (read-only)
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+      
+      # AWS credentials (future support, read-only)
+      - ${HOME}/.aws:/root/.aws:ro
+      
+      # Azure credentials (future support, read-only)
+      - ${HOME}/.azure:/root/.azure:ro
+      
+      # Benchmark output directory (read-write)
+      - ./benchmarks:/workspace/benchmarks
+      
+      # Terraform state persistence (optional)
+      - ./terraform/gcp/.terraform:/workspace/terraform/gcp/.terraform
+      - ./terraform/aws/.terraform:/workspace/terraform/aws/.terraform
+      - ./terraform/azure/.terraform:/workspace/terraform/azure/.terraform
+      
+      # Kubernetes config (generated dynamically)
+      - ${HOME}/.kube:/root/.kube
+    
+    # Override command with actual benchmark parameters
+    # Example usage: docker-compose run devops-benchmark --cloud gcp --machine-type n2-standard-4 --duration 600
+    command: ["--help"]
+    
+    # Network mode
+    network_mode: bridge
+
+# Example usage patterns:
+#
+# Build the image:
+#   docker-compose build
+#
+# Run with custom arguments:
+#   docker-compose run --rm devops-benchmark --cloud gcp --machine-type n2-standard-4 --duration 600 --cleanup
+#
+# Run with environment variables from .env file:
+#   docker-compose --env-file .env.local run --rm devops-benchmark --cloud gcp --machine-type n2-standard-4 --duration 600
+#
+# Interactive shell for debugging:
+#   docker-compose run --rm devops-benchmark /bin/bash

@@ -1,5 +1,83 @@
 # Online Boutique Cloud‑Agnostic Benchmarking Pipeline
 
+## 🐳 Docker Quick Start
+
+**New!** The entire pipeline is now containerized for easy deployment without manual dependency installation.
+
+### Prerequisites
+
+Set up your cloud credentials and environment variables:
+
+**For GCP (Google Cloud Platform):**
+```bash
+# Option 1: Use gcloud CLI (recommended for development)
+gcloud auth application-default login
+gcloud config set project your-project-id
+export GCP_PROJECT_ID="your-project-id"
+
+# Option 2: Use service account key (recommended for CI/CD)
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
+export GCP_PROJECT_ID="your-project-id"
+```
+
+**For AWS (future support):**
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_DEFAULT_REGION="us-west-2"
+```
+
+**For Azure (future support):**
+```bash
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+export AZURE_TENANT_ID="your-tenant-id"
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_CLIENT_SECRET="your-client-secret"
+```
+
+### Run a Benchmark in 3 Steps
+
+```bash
+# 1. Set your GCP project ID
+export GCP_PROJECT_ID="your-project-id"
+
+# 2. Build the Docker image
+docker build -t devops-benchmark:latest .
+
+# 3. Run a benchmark (uses your gcloud credentials)
+docker run -it --rm \
+  -v ~/.config/gcloud:/root/.config/gcloud:ro \
+  -v $(pwd)/benchmarks:/workspace/benchmarks \
+  -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \
+  devops-benchmark:latest \
+  --cloud gcp \
+  --machine-type n2-standard-4 \
+  --duration 600 \
+  --cleanup
+```
+
+**Or use the convenience script:**
+
+```bash
+./benchmark.sh gcp n2-standard-4 600 --build --cleanup
+```
+
+**What's included in the Docker image:**
+- ✅ Python 3.11
+- ✅ Terraform 1.7.5 (pinned)
+- ✅ Helm 3.14.0 (pinned)
+- ✅ kubectl 1.29.2 (pinned)
+- ✅ Google Cloud SDK 462.0.1 (pinned)
+- ✅ AWS CLI 2.15.18 (pinned, for future support)
+- ✅ Azure CLI (for future support)
+- ✅ All Python dependencies
+
+> **Note:** All tool versions are pinned for reproducible benchmarks.
+
+📖 **Full Docker documentation**: [docs/DOCKER.md](docs/DOCKER.md)
+
+---
+
 ## 1. Objective and Scope
 
 ### Objective
