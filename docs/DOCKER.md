@@ -801,7 +801,15 @@ All components are pinned to specific versions for reproducible benchmarks:
 | AWS CLI | 2.15.18 | AWS CLI (future support) |
 | Azure CLI | Latest* | Azure CLI (future support) |
 
-*Azure CLI version is managed via apt repository. For production use with pinned version, manually specify version after build.
+*Azure CLI version is managed via apt repository. For production use with pinned version:
+```bash
+# After container is built, pin to specific version
+apt-cache madison azure-cli  # List available versions
+apt-get install azure-cli=<version>  # e.g., azure-cli=2.57.0-1~bookworm
+
+# Or rebuild Dockerfile with specific version in RUN command
+```
+See [Azure CLI release notes](https://docs.microsoft.com/en-us/cli/azure/release-notes-azure-cli) for version history.
 
 ### Python Packages
 
