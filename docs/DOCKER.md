@@ -4,6 +4,8 @@ This guide covers using the containerized DevOps benchmarking automation pipelin
 
 ## Table of Contents
 
+- [Environment Variables Quick Reference](#environment-variables-quick-reference)
+- [Setting Up Cloud Credentials](#setting-up-cloud-credentials)
 - [Quick Start](#quick-start)
 - [Building the Image](#building-the-image)
 - [Running Benchmarks](#running-benchmarks)
@@ -18,6 +20,156 @@ This guide covers using the containerized DevOps benchmarking automation pipelin
 - [Advanced Usage](#advanced-usage)
 - [Troubleshooting](#troubleshooting)
 - [Image Details](#image-details)
+
+---
+
+## Environment Variables Quick Reference
+
+Before running the container, you need to set up the appropriate environment variables for your cloud provider:
+
+### GCP (Google Cloud Platform)
+
+```bash
+# Required
+export GCP_PROJECT_ID="your-gcp-project-id"
+
+# Optional (if using service account key instead of gcloud auth)
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
+```
+
+### AWS (Amazon Web Services) - Future Support
+
+```bash
+# Required
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Optional (defaults to us-west-2)
+export AWS_DEFAULT_REGION="us-west-2"
+export AWS_SESSION_TOKEN="..."  # If using temporary credentials
+```
+
+### Azure (Microsoft Azure) - Future Support
+
+```bash
+# Required
+export AZURE_SUBSCRIPTION_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export AZURE_TENANT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export AZURE_CLIENT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export AZURE_CLIENT_SECRET="your-client-secret"
+```
+
+**Complete list of supported environment variables:**
+
+| Variable | Cloud | Required | Default | Description |
+|----------|-------|----------|---------|-------------|
+| `GCP_PROJECT_ID` | GCP | Yes | - | Google Cloud project identifier |
+| `GOOGLE_APPLICATION_CREDENTIALS` | GCP | No | - | Path to service account JSON key file |
+| `AWS_ACCESS_KEY_ID` | AWS | Yes | - | AWS access key for authentication |
+| `AWS_SECRET_ACCESS_KEY` | AWS | Yes | - | AWS secret key for authentication |
+| `AWS_DEFAULT_REGION` | AWS | No | `us-west-2` | AWS region for resources |
+| `AWS_SESSION_TOKEN` | AWS | No | - | Temporary session token (if using STS) |
+| `AZURE_SUBSCRIPTION_ID` | Azure | Yes | - | Azure subscription identifier |
+| `AZURE_TENANT_ID` | Azure | Yes | - | Azure Active Directory tenant ID |
+| `AZURE_CLIENT_ID` | Azure | Yes | - | Azure service principal client ID |
+| `AZURE_CLIENT_SECRET` | Azure | Yes | - | Azure service principal client secret |
+
+---
+
+## Setting Up Cloud Credentials
+
+### GCP Authentication Setup
+
+Before running the container, you must authenticate with Google Cloud:
+
+**Option 1: Using gcloud CLI (Recommended for development)**
+
+```bash
+# Install gcloud CLI on your host machine (if not already installed)
+# Visit: https://cloud.google.com/sdk/docs/install
+
+# Authenticate and set up application default credentials
+gcloud auth login
+gcloud auth application-default login
+
+# Set your default project
+gcloud config set project YOUR_PROJECT_ID
+
+# Verify authentication
+gcloud auth list
+gcloud config list
+
+# The credentials will be stored in ~/.config/gcloud/
+# These will be mounted into the container
+```
+
+**Option 2: Using Service Account Key (Recommended for production/CI/CD)**
+
+```bash
+# 1. Create a service account in GCP Console
+#    - Go to IAM & Admin > Service Accounts
+#    - Click "Create Service Account"
+#    - Name: devops-benchmark-sa
+#    - Roles needed:
+#      - Kubernetes Engine Admin
+#      - Compute Admin
+#      - Service Account User
+#      - Storage Object Viewer (for pulling images)
+
+# 2. Create and download the JSON key
+#    - Click on the service account
+#    - Go to "Keys" tab
+#    - Click "Add Key" > "Create new key" > JSON
+#    - Save the file securely (e.g., ~/gcp-sa-key.json)
+
+# 3. Set environment variables
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp-sa-key.json"
+export GCP_PROJECT_ID="your-project-id"
+
+# 4. Verify the service account
+gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+gcloud config set project "$GCP_PROJECT_ID"
+```
+
+### AWS Authentication Setup (Future)
+
+```bash
+# Option 1: Using AWS CLI credentials file
+# Install AWS CLI: https://aws.amazon.com/cli/
+aws configure
+# Enter your Access Key ID, Secret Access Key, and default region
+# Credentials will be stored in ~/.aws/credentials
+
+# Option 2: Using environment variables
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_DEFAULT_REGION="us-west-2"
+
+# Option 3: Using IAM role (for EC2 instances)
+# No explicit credentials needed, instance profile will be used
+```
+
+### Azure Authentication Setup (Future)
+
+```bash
+# Option 1: Using Azure CLI
+# Install Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+az login
+az account set --subscription "your-subscription-id"
+
+# Option 2: Using Service Principal
+# 1. Create a service principal
+az ad sp create-for-rbac --name devops-benchmark-sp \
+  --role Contributor \
+  --scopes /subscriptions/YOUR_SUBSCRIPTION_ID
+
+# 2. The output will contain the credentials
+# Use them to set environment variables:
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+export AZURE_TENANT_ID="your-tenant-id"
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_CLIENT_SECRET="your-client-secret"
+```
 
 ---
 
@@ -46,13 +198,15 @@ Build the Docker image from the Dockerfile:
 docker build -t devops-benchmark:latest .
 ```
 
-> **Note**: The Docker build requires internet access to download Terraform, Helm, kubectl, and cloud CLIs. If you're building in a restricted environment, the build may fail. Ensure you have access to:
-> - `releases.hashicorp.com` (Terraform)
-> - `baltocdn.com` (Helm)
-> - `dl.k8s.io` (kubectl)
-> - `packages.cloud.google.com` (Google Cloud SDK)
-> - `awscli.amazonaws.com` (AWS CLI)
-> - `aka.ms` (Azure CLI)
+> **Note**: The Docker build requires internet access to download pinned versions of tools. Ensure you have access to:
+> - `releases.hashicorp.com` (Terraform 1.7.5)
+> - `get.helm.sh` (Helm 3.14.0)
+> - `dl.k8s.io` (kubectl 1.29.2)
+> - `dl.google.com` (Google Cloud SDK 462.0.1)
+> - `awscli.amazonaws.com` (AWS CLI 2.15.18)
+> - `aka.ms` (Azure CLI latest)
+>
+> All versions are pinned for reproducible benchmarks across time.
 
 ### Multi-architecture Build (Optional)
 
@@ -635,15 +789,19 @@ docker build --progress=plain -t devops-benchmark:latest .
 
 ### Installed Components
 
+All components are pinned to specific versions for reproducible benchmarks:
+
 | Component | Version | Purpose |
 |-----------|---------|---------|
 | Python | 3.11 | Automation scripts |
 | Terraform | 1.7.5 | Infrastructure provisioning |
-| Helm | 3.x (from apt) | Kubernetes package manager |
+| Helm | 3.14.0 | Kubernetes package manager |
 | kubectl | 1.29.2 | Kubernetes CLI |
-| Google Cloud SDK | Latest | GCP CLI and authentication |
-| AWS CLI | v2 | AWS CLI (future support) |
-| Azure CLI | Latest | Azure CLI (future support) |
+| Google Cloud SDK | 462.0.1 | GCP CLI and authentication |
+| AWS CLI | 2.15.18 | AWS CLI (future support) |
+| Azure CLI | Latest* | Azure CLI (future support) |
+
+*Azure CLI version is managed via apt repository. For production use with pinned version, manually specify version after build.
 
 ### Python Packages
 
