@@ -56,11 +56,18 @@ class TerraformExecutor:
             cwd=self.terraform_dir,
             capture_output=True,
             text=True,
-            check=True
+            check=False  # CHANGE: Don't raise immediately
         )
         
         if result.stdout:
             logger.debug(result.stdout)
+        
+        # CHANGE: Log errors before raising
+        if result.returncode != 0:
+            logger.error(f"Terraform command failed: {' '.join(cmd)}")
+            logger.error(f"STDOUT:\n{result.stdout}")
+            logger.error(f"STDERR:\n{result.stderr}")
+            raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         
         return result
     
