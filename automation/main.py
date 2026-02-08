@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import sys
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -40,6 +41,34 @@ class BenchmarkOrchestrator:
         self.prometheus = PrometheusClient(config)
         self.benchmark_runner = BenchmarkRunner(config)
         self.artifact_generator = ArtifactGenerator(config)
+
+    def _setup_authentication(self):
+        """Setup GCP authentication for Terraform and gcloud"""
+        import os
+        import subprocess
+        
+        sa_key_path = '/root/.gcp/service-account-key.json'
+        
+        if os.path.exists(sa_key_path):
+            logger.info("Authenticating with service account...")
+            
+            # Activate service account for gcloud
+            result = subprocess.run(
+                ['gcloud', 'auth', 'activate-service-account', '--key-file', sa_key_path],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Failed to activate service account")
+                logger.error(f"STDERR: {result.stderr}")
+                raise RuntimeError("Service account activation failed")
+            
+            # Set environment variable for Terraform
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
+            logger.info("Authentication configured successfully")
+        else:
+            logger.info("No service account key found, using default credentials")
         
     def run_full_pipeline(self):
         """Execute the complete benchmark pipeline"""
@@ -48,10 +77,20 @@ class BenchmarkOrchestrator:
         logger.info("=" * 60)
         
         try:
+            # Step 0: Setup authentication
+            logger.info("Step 0: Setting up authentication...")
+            self._setup_authentication()
+            logger.info("Authentication setup completed")
+
             # Step 1: Provision infrastructure
             logger.info("Step 1: Provisioning infrastructure...")
             cluster_info = self.terraform.provision_cluster()
             logger.info(f"Cluster provisioned: {cluster_info['cluster_name']}")
+
+            # Step 1.1: Configure kubectl to connect to the cluster
+            logger.info("Step 1.5: Configuring kubectl...")
+            self.helm.configure_kubectl(cluster_info)
+            logger.info("kubectl configured")
             
             # Step 2: Deploy Online Boutique
             logger.info("Step 2: Deploying Online Boutique...")
@@ -61,6 +100,14 @@ class BenchmarkOrchestrator:
             # Step 3: Deploy monitoring stack
             logger.info("Step 3: Deploying Prometheus + Grafana...")
             monitoring_info = self.helm.deploy_monitoring()
+
+            # Setup port-forward for metrics collection
+            prometheus_forward = self.helm.setup_prometheus_access()
+
+            # Update Prometheus URL to use localhost
+            self.prometheus = PrometheusClient({
+                'prometheus_url': 'http://localhost:9090'
+            })
             logger.info(f"Monitoring deployed. Grafana URL: {monitoring_info.get('grafana_url')}")
             
             # Step 4: Wait for services to be ready
@@ -101,6 +148,8 @@ class BenchmarkOrchestrator:
             logger.info(f"Cluster: {cluster_info['cluster_name']}")
             logger.info(f"Machine Type: {cluster_info['machine_type']}")
             logger.info(f"CPU Vendor: {cluster_info['cpu_vendor']}")
+            logger.info(f"Region: {self.config['region']}")
+            logger.info(f"Zone: {self.config['zone']}")
             logger.info(f"Duration: {self.config['duration']}s")
             logger.info(f"Artifact: {artifact_path}")
             logger.info(f"Grafana: {monitoring_info.get('grafana_url')}")
@@ -112,6 +161,15 @@ class BenchmarkOrchestrator:
                 'cluster_info': cluster_info,
                 'monitoring_info': monitoring_info
             }
+        
+        except KeyboardInterrupt:
+            logger.warning("=" * 60)
+            logger.warning("INTERRUPTED BY USER (Ctrl+C)")
+            logger.warning("=" * 60)
+            return {
+                'success': False,
+                'error': 'Interrupted by user'
+            }
             
         except Exception as e:
             logger.error(f"Pipeline failed: {str(e)}", exc_info=True)
@@ -122,13 +180,38 @@ class BenchmarkOrchestrator:
     
     def cleanup(self):
         """Clean up resources"""
+        logger.info("=" * 60)
         logger.info("Cleaning up resources...")
+        logger.info("=" * 60)
+        
+        cleanup_errors = []
+        
+        # Step 1: Uninstall Helm releases
         try:
+            logger.info("Step 1: Uninstalling Helm releases...")
             self.helm.uninstall_all()
-            self.terraform.destroy_cluster()
-            logger.info("Cleanup completed")
+            logger.info("Helm releases uninstalled")
         except Exception as e:
-            logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
+            logger.error(f"Helm cleanup failed: {str(e)}")
+            cleanup_errors.append(f"Helm: {str(e)}")
+        
+        # Step 2: Destroy infrastructure
+        try:
+            logger.info("Step 2: Destroying cluster...")
+            self.terraform.destroy_cluster()
+            logger.info("Cluster destroyed")
+        except Exception as e:
+            logger.error(f"Terraform cleanup failed: {str(e)}")
+            cleanup_errors.append(f"Terraform: {str(e)}")
+        
+        if cleanup_errors:
+            logger.warning("Cleanup completed with errors:")
+            for error in cleanup_errors:
+                logger.warning(f"  - {error}")
+        else:
+            logger.info("=" * 60)
+            logger.info("Cleanup completed successfully")
+            logger.info("=" * 60)
 
 
 def parse_args():
@@ -198,6 +281,20 @@ def parse_args():
         action='store_true',
         help='Only perform cleanup (no benchmark)'
     )
+
+    parser.add_argument(
+        '--region',
+        type=str,
+        default='us-central1',
+        help='GCP region (default: us-central1)'
+    )
+
+    parser.add_argument(
+        '--zone',
+        type=str,
+        default='us-central1-a',
+        help='GCP zone (default: us-central1-a)'
+    )
     
     return parser.parse_args()
 
@@ -212,10 +309,13 @@ def main():
         'machine_type': args.machine_type,
         'cpu_vendor': args.cpu_vendor,
         'cpu_generation': args.cpu_generation,
+        'region': args.region,
+        'zone': args.zone,
         'duration': args.duration,
         'node_count': args.node_count,
         'skip_provision': args.skip_provision,
-        'run_id': f"{args.cloud}-{args.cpu_vendor}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        'run_id': f"{args.cloud}-{args.cpu_vendor}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+        'gcp_project_id': os.environ.get('GCP_PROJECT_ID')  # ADD THIS LINE
     }
     
     orchestrator = BenchmarkOrchestrator(config)
@@ -228,11 +328,41 @@ def main():
     # Run the pipeline
     result = orchestrator.run_full_pipeline()
     
-    # Optional cleanup
-    if args.cleanup:
-        orchestrator.cleanup()
+    try:
+        # Handle cleanup-only mode
+        if args.cleanup_only:
+            orchestrator.cleanup()
+            return 0
+        
+        # Run the pipeline
+        result = orchestrator.run_full_pipeline()
+        
+        # Optional cleanup
+        if args.cleanup:
+            orchestrator.cleanup()
+        
+        return 0 if result['success'] else 1
     
-    return 0 if result['success'] else 1
+    except KeyboardInterrupt:
+        logger.warning("\n" + "=" * 60)
+        logger.warning("Interrupted by user. Starting cleanup...")
+        logger.warning("=" * 60)
+        
+        # Always cleanup on interrupt if --cleanup flag was set
+        if args.cleanup:
+            try:
+                orchestrator.cleanup()
+            except Exception as e:
+                logger.error(f"Cleanup after interrupt failed: {e}")
+        else:
+            logger.warning("Cleanup not requested. Cluster may still be running!")
+            logger.warning(f"To cleanup manually, run: terraform -chdir=terraform/{args.cloud} destroy")
+        
+        return 130  # Standard exit code for SIGINT
+    
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        return 1
 
 
 if __name__ == '__main__':
