@@ -55,6 +55,31 @@ class HelmDeployer:
             
             logger.info("kubectl configured successfully")
 
+    def configure_loadgenerator(self, users_count, rps):
+        """Configure loadgenerator with specified users and request rate"""
+        logger.info(f"Configuring loadgenerator with USERS={users_count}, RATE={rps}...")
+        
+        try:
+            # Patch the loadgenerator deployment with environment variables
+            self._run_kubectl_command([
+                'set', 'env', 'deployment/loadgenerator',
+                f'USERS={users_count}',
+                f'RATE={rps}'
+            ])
+            
+            # Wait for the new pod to be ready
+            logger.info("Waiting for loadgenerator to restart with new configuration...")
+            self._run_kubectl_command([
+                'rollout', 'status', 'deployment/loadgenerator',
+                '--timeout=2m'
+            ])
+            
+            logger.info(f"Loadgenerator configured successfully: USERS={users_count}, RATE={rps}")
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to configure loadgenerator: {e}")
+            raise
+
     def setup_prometheus_access(self):
         """Setup port-forward to access Prometheus from outside cluster"""
         import subprocess

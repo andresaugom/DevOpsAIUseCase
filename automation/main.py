@@ -96,6 +96,14 @@ class BenchmarkOrchestrator:
             logger.info("Step 2: Deploying Online Boutique...")
             self.helm.deploy_online_boutique()
             logger.info("Online Boutique deployed")
+
+            # Step 2.1: Deploy load generator
+            logger.info("Step 2.1: Deploying load generator...")
+            self.helm.deploy_load_generator(
+                users_count=self.config['users_count'],
+                rps=self.config['rps']
+            )
+            logger.info("Load generator deployed")
             
             # Step 3: Deploy monitoring stack
             logger.info("Step 3: Deploying Prometheus + Grafana...")
@@ -295,6 +303,20 @@ def parse_args():
         default='us-central1-a',
         help='GCP zone (default: us-central1-a)'
     )
+
+    parser.add_argument(
+        '--users-count', 
+        type=int,
+        default=100,
+        help='Number of concurrent users for load testing (default: 100)'
+    )
+
+    parser.add_argument(
+        '--rps',
+        type=int,
+        default=50,
+        help='Target requests per second for load testing (default: 50)'
+    )
     
     return parser.parse_args()
 
@@ -315,7 +337,9 @@ def main():
         'node_count': args.node_count,
         'skip_provision': args.skip_provision,
         'run_id': f"{args.cloud}-{args.cpu_vendor}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-        'gcp_project_id': os.environ.get('GCP_PROJECT_ID')  # ADD THIS LINE
+        'gcp_project_id': os.environ.get('GCP_PROJECT_ID'),  # ADD THIS LINE
+        'users_count': args.users_count,
+        'rps': args.rps
     }
     
     orchestrator = BenchmarkOrchestrator(config)
