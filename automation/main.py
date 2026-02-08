@@ -97,13 +97,13 @@ class BenchmarkOrchestrator:
             self.helm.deploy_online_boutique()
             logger.info("Online Boutique deployed")
 
-            # Step 2.1: Deploy load generator
-            logger.info("Step 2.1: Deploying load generator...")
-            self.helm.deploy_load_generator(
+            # Step 2.1: Configure load generator
+            logger.info("Step 2.1: Configuring load generator...")
+            self.helm.configure_loadgenerator(
                 users_count=self.config['users_count'],
                 rps=self.config['rps']
             )
-            logger.info("Load generator deployed")
+            logger.info("Load generator configured")
             
             # Step 3: Deploy monitoring stack
             logger.info("Step 3: Deploying Prometheus + Grafana...")
