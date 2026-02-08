@@ -1,5 +1,5 @@
 # Prometheus Stack Helm Values
-# Custom values for deploying kube-prometheus-stack
+# Custom values for deploying kube-prometheus-stack with Grafana
 
 # Prometheus configuration
 prometheus:
@@ -7,17 +7,17 @@ prometheus:
   
   prometheusSpec:
     # Storage configuration
-    retention: 15d
-    retentionSize: "50GB"
+    retention: 2d
+    retentionSize: "10GB"
     
     # Resource limits
     resources:
       requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
         cpu: 500m
         memory: 2Gi
-      limits:
-        cpu: 1000m
-        memory: 4Gi
     
     # Storage
     storageSpec:
@@ -26,80 +26,84 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 50Gi
+              storage: 10Gi
     
-    # Scrape interval for benchmark metrics
-    scrapeInterval: 15s
-    evaluationInterval: 15s
+    # Scrape interval - FIXED: scrapeTimeout must be less than scrapeInterval
+    scrapeInterval: 30s
+    scrapeTimeout: 25s
+    evaluationInterval: 30s
     
-    # Service monitors - automatically discover services
+    # Service monitors
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
-    
-    # Additional scrape configs for custom targets
-    additionalScrapeConfigs: []
 
-# Grafana configuration
+# Grafana configuration - ENABLED
 grafana:
   enabled: true
   
-  # Admin credentials (change in production)
+  # Admin credentials
   adminPassword: "admin"
   
   # Persistence
   persistence:
     enabled: true
-    size: 10Gi
+    size: 5Gi
   
-  # Service type - use LoadBalancer for external access
+  # Resource limits for Grafana
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Service type - LoadBalancer for external access
   service:
     type: LoadBalancer
   
-  # Grafana dashboards
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-        - name: 'default'
-          orgId: 1
-          folder: ''
-          type: file
-          disableDeletion: false
-          editable: true
-          options:
-            path: /var/lib/grafana/dashboards/default
-  
-  # Data sources
-  datasources:
-    datasources.yaml:
-      apiVersion: 1
-      datasources:
-        - name: Prometheus
-          type: prometheus
-          url: http://prometheus-operated:9090
-          access: proxy
-          isDefault: true
+  # Sidecar configuration for dynamic dashboard loading
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+      # Let the default datasource configuration work
+      defaultDatasourceEnabled: true
 
-# Alertmanager - optional for production
+# Alertmanager - disabled for benchmarking
 alertmanager:
   enabled: false
 
 # Node exporter - collect node-level metrics
 nodeExporter:
   enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 50Mi
+    limits:
+      cpu: 200m
+      memory: 100Mi
 
-# Kube state metrics - collect Kubernetes metrics
+# Kube state metrics
 kubeStateMetrics:
   enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      cpu: 200m
+      memory: 200Mi
 
 # Prometheus operator
 prometheusOperator:
   enabled: true
-  
   resources:
     requests:
-      cpu: 200m
-      memory: 200Mi
+      cpu: 100m
+      memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 500Mi
+      cpu: 200m
+      memory: 256Mi
