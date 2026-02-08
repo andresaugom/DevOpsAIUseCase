@@ -7,6 +7,7 @@ Handles Helm deployments for Online Boutique and monitoring stack.
 import logging
 import subprocess
 import time
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -18,26 +19,85 @@ class HelmDeployer:
     def __init__(self, config):
         self.config = config
         self.kubernetes_dir = Path(__file__).parent.parent.parent / 'kubernetes'
+    
+    def configure_kubectl(self, cluster_info):
+        """Configure kubectl to connect to the cluster"""
+        logger.info("Configuring kubectl...")
+        
+        if self.config['cloud'] == 'gcp':
+            if os.path.exists('/root/.gcp/service-account-key.json'):
+                logger.info("Authenticating with service account...")
+                subprocess.run([
+                    'gcloud', 'auth', 'activate-service-account', 
+                    '--key-file=/root/.gcp/service-account-key.json'
+                ], check=True)
+
+            cmd = [
+                'gcloud', 'container', 'clusters', 'get-credentials',
+                cluster_info['cluster_name'],
+                '--zone', cluster_info['zone'],
+                '--project', self.config['gcp_project_id']
+            ]
+            
+            logger.debug(f"Running: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Failed to configure kubectl")
+                logger.error(f"STDOUT:\n{result.stdout}")
+                logger.error(f"STDERR:\n{result.stderr}")
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+            
+            logger.info("kubectl configured successfully")
+
+    def setup_prometheus_access(self):
+        """Setup port-forward to access Prometheus from outside cluster"""
+        import subprocess
+        import threading
+        
+        logger.info("Setting up port-forward to Prometheus...")
+        
+        # Start port-forward in background
+        cmd = [
+            'kubectl', 'port-forward',
+            '-n', 'monitoring',
+            'svc/prometheus-operated',
+            '9090:9090'
+        ]
+        
+        # This will run in background
+        process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Give it a moment to establish
+        import time
+        time.sleep(5)
+        
+        logger.info("Prometheus accessible at http://localhost:9090")
+        
+        return process
         
     def deploy_online_boutique(self):
         """Deploy Online Boutique application"""
         logger.info("Deploying Online Boutique...")
         
-        # Add Helm repository
-        self._run_helm_command([
-            'repo', 'add', 'google-samples',
-            'https://googlecloudplatform.github.io/microservices-demo'
-        ])
-        self._run_helm_command(['repo', 'update'])
+        # Use official Kubernetes manifests (Helm chart is deprecated)
+        manifest_url = "https://raw.githubusercontent.com/GoogleCloudPlatform/microservices-demo/main/release/kubernetes-manifests.yaml"
         
-        # Install Online Boutique
-        values_file = self.kubernetes_dir / 'online-boutique' / 'values.yaml'
-        self._run_helm_command([
-            'install', 'online-boutique', 'google-samples/online-boutique',
-            '--namespace', 'default',
-            '--values', str(values_file),
-            '--wait',
-            '--timeout', '10m'
+        logger.info("Applying Online Boutique manifests from GitHub...")
+        self._run_kubectl_command(['apply', '-f', manifest_url])
+        
+        # Wait for frontend to be ready as a health check
+        logger.info("Waiting for frontend service to be ready...")
+        self._run_kubectl_command([
+            'wait', '--for=condition=available',
+            'deployment/frontend',
+            '--timeout=5m',
+            '--namespace=default'
         ])
         
         logger.info("Online Boutique deployed successfully")
@@ -47,29 +107,78 @@ class HelmDeployer:
         logger.info("Deploying monitoring stack...")
         
         # Add Helm repository
+        logger.info("Adding Helm repository...")
         self._run_helm_command([
             'repo', 'add', 'prometheus-community',
             'https://prometheus-community.github.io/helm-charts'
         ])
         self._run_helm_command(['repo', 'update'])
+        logger.info("Helm repository configured")
         
         # Create monitoring namespace
-        self._run_kubectl_command([
-            'create', 'namespace', 'monitoring', '--dry-run=client', '-o', 'yaml'
-        ])
-        self._run_kubectl_command(['apply', '-f', '-'])
+        logger.info("Creating monitoring namespace...")
+        try:
+            self._run_kubectl_command(['create', 'namespace', 'monitoring'])
+            logger.info("Namespace created")
+        except subprocess.CalledProcessError:
+            logger.info("Namespace already exists, continuing...")
         
-        # Install Prometheus stack
+        # Verify values file exists
         values_file = self.kubernetes_dir / 'monitoring' / 'prometheus-values.yaml'
-        self._run_helm_command([
-            'install', 'prometheus', 'prometheus-community/kube-prometheus-stack',
-            '--namespace', 'monitoring',
-            '--values', str(values_file),
-            '--wait',
-            '--timeout', '10m'
-        ])
+        if not values_file.exists():
+            raise FileNotFoundError(f"Values file not found: {values_file}")
+        
+        logger.info(f"Using values file: {values_file}")
+        logger.info("Installing Prometheus stack (timeout: 15 minutes)...")
+        logger.info("This includes Prometheus Operator, Grafana, and several components...")
+        
+        # Install with explicit timeout
+        import signal
+        import threading
+        
+        # Create a timer to log progress
+        def log_progress():
+            elapsed = 0
+            while elapsed < 900:  # 15 minutes
+                time.sleep(60)  # Every minute
+                elapsed += 60
+                logger.info(f"Still installing... ({elapsed//60} minutes elapsed)")
+        
+        progress_thread = threading.Thread(target=log_progress, daemon=True)
+        progress_thread.start()
+        
+        try:
+            self._run_helm_command([
+                'install', 'prometheus', 'prometheus-community/kube-prometheus-stack',
+                '--namespace', 'monitoring',
+                '--values', str(values_file),
+                '--wait',
+                '--timeout', '15m',
+                '--debug'
+            ])
+            logger.info("Prometheus stack installed successfully!")
+        except subprocess.CalledProcessError as e:
+            logger.error("Helm install failed or timed out!")
+            logger.error("Checking deployment status...")
+            
+            # Check what got deployed
+            try:
+                result = self._run_kubectl_command(['get', 'pods', '-n', 'monitoring', '-o', 'wide'])
+                logger.error(f"Pods in monitoring namespace:\n{result.stdout}")
+            except:
+                logger.error("No pods found in monitoring namespace")
+            
+            # Check events
+            try:
+                result = self._run_kubectl_command(['get', 'events', '-n', 'monitoring', '--sort-by=.lastTimestamp'])
+                logger.error(f"Recent events:\n{result.stdout}")
+            except:
+                pass
+            
+            raise RuntimeError("Prometheus deployment failed or timed out") from e
         
         # Get Grafana URL
+        logger.info("Retrieving Grafana service URL...")
         grafana_url = self._get_service_url('monitoring', 'prometheus-grafana')
         
         logger.info("Monitoring stack deployed successfully")
@@ -130,8 +239,18 @@ class HelmDeployer:
             cmd,
             capture_output=True,
             text=True,
-            check=True
+            check=False  # Don't raise immediately
         )
+        
+        if result.stdout:
+            logger.debug(result.stdout)
+        
+        # Log errors before raising
+        if result.returncode != 0:
+            logger.error(f"Helm command failed: {' '.join(cmd)}")
+            logger.error(f"STDOUT:\n{result.stdout}")
+            logger.error(f"STDERR:\n{result.stderr}")
+            raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         
         return result
     
@@ -144,8 +263,18 @@ class HelmDeployer:
             cmd,
             capture_output=True,
             text=True,
-            check=True
+            check=False  # Don't raise immediately
         )
+        
+        if result.stdout:
+            logger.debug(result.stdout)
+        
+        # Log errors before raising
+        if result.returncode != 0:
+            logger.error(f"kubectl command failed: {' '.join(cmd)}")
+            logger.error(f"STDOUT:\n{result.stdout}")
+            logger.error(f"STDERR:\n{result.stderr}")
+            raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         
         return result
     
