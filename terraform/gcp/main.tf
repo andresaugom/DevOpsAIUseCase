@@ -21,6 +21,9 @@ resource "google_container_cluster" "benchmark_cluster" {
   name     = var.cluster_name
   location = var.zone
 
+  # Intentionally disabling the deletion protection, so the cleanup can be performed.
+  deletion_protection = false
+
   # Disable autoscaling and use a fixed node pool for reproducibility
   remove_default_node_pool = true
   initial_node_count       = 1
@@ -28,6 +31,11 @@ resource "google_container_cluster" "benchmark_cluster" {
   # Network configuration
   network    = "default"
   subnetwork = "default"
+
+  # Disable release channel for version control
+  release_channel {
+    channel = "UNSPECIFIED"
+  }
 
   # Disable features that might interfere with benchmarking
   logging_config {
@@ -44,7 +52,7 @@ resource "google_container_cluster" "benchmark_cluster" {
 
 # Fixed Node Pool for Benchmarking
 resource "google_container_node_pool" "benchmark_nodes" {
-  name       = "${var.cluster_name}-node-pool"
+  name       = "${var.cluster_name}-np"
   location   = var.zone
   cluster    = google_container_cluster.benchmark_cluster.name
   node_count = var.node_count
@@ -59,7 +67,7 @@ resource "google_container_node_pool" "benchmark_nodes" {
       workload      = "benchmark"
       machine_type  = replace(var.machine_type, "-", "_")
       cpu_vendor    = var.cpu_vendor
-      cpu_generation = var.cpu_generation
+      cpu_generation = replace(lower(replace(var.cpu_generation, " ", "-")), "/[^a-z0-9-_.]/", "-")
     }
 
     # Scopes for node permissions
