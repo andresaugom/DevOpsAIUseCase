@@ -136,11 +136,15 @@ class HelmDeployer:
         import signal
         import threading
         
+        # Create a stop event for the progress thread
+        stop_event = threading.Event()
+        
         # Create a timer to log progress
         def log_progress():
             elapsed = 0
-            while elapsed < 900:  # 15 minutes
-                time.sleep(60)  # Every minute
+            while not stop_event.is_set() and elapsed < 900:  # 15 minutes
+                if stop_event.wait(60):  # Sleep 60s or until stopped
+                    break
                 elapsed += 60
                 logger.info(f"Still installing... ({elapsed//60} minutes elapsed)")
         
@@ -148,8 +152,9 @@ class HelmDeployer:
         progress_thread.start()
         
         try:
+            # Use upgrade --install for idempotent deployment
             self._run_helm_command([
-                'install', 'prometheus', 'prometheus-community/kube-prometheus-stack',
+                'upgrade', '--install', 'prometheus', 'prometheus-community/kube-prometheus-stack',
                 '--namespace', 'monitoring',
                 '--values', str(values_file),
                 '--wait',
@@ -176,6 +181,10 @@ class HelmDeployer:
                 pass
             
             raise RuntimeError("Prometheus deployment failed or timed out") from e
+        finally:
+            # Always stop the progress thread
+            stop_event.set()
+            progress_thread.join(timeout=2)
         
         # Get Grafana URL
         logger.info("Retrieving Grafana service URL...")
@@ -217,16 +226,23 @@ class HelmDeployer:
         raise TimeoutError("Services did not become ready in time")
     
     def uninstall_all(self):
-        """Uninstall all Helm releases"""
-        logger.info("Uninstalling Helm releases...")
+        """Uninstall all releases"""
+        logger.info("Uninstalling releases...")
         
+        # Online Boutique is deployed via kubectl, not Helm
         try:
-            self._run_helm_command(['uninstall', 'online-boutique', '-n', 'default'])
+            manifest_url = "https://raw.githubusercontent.com/GoogleCloudPlatform/microservices-demo/main/release/kubernetes-manifests.yaml"
+            logger.info("Deleting Online Boutique (kubectl)...")
+            self._run_kubectl_command(['delete', '-f', manifest_url])
+            logger.info("Online Boutique deleted successfully")
         except Exception as e:
             logger.warning(f"Error uninstalling online-boutique: {e}")
         
+        # Prometheus is a Helm release
         try:
+            logger.info("Uninstalling Prometheus (Helm)...")
             self._run_helm_command(['uninstall', 'prometheus', '-n', 'monitoring'])
+            logger.info("Prometheus uninstalled successfully")
         except Exception as e:
             logger.warning(f"Error uninstalling prometheus: {e}")
     
