@@ -1,6 +1,17 @@
 # Online Boutique Cloud‑Agnostic Benchmarking Pipeline
 
-## 🐳 Docker Quick Start
+## What's New - Enhanced Metrics Collection v2.0
+
+* **Per-Pod & Per-Node Metrics**: See CPU throttling and resource usage for each individual pod  
+* **Zero Null Values**: All metrics default to `0.0` for reliable analysis  
+* **Machine Type Specs**: Automatic GCP machine type specifications with vCPUs, memory, platform  
+* **Enhanced Artifacts**: JSON + 3 CSV files per run for comprehensive analysis  
+
+**[Enhancement Summary](ENHANCEMENT_SUMMARY.md)** | **[Full Documentation](ENHANCED_METRICS.md)** | **[Migration Guide](MIGRATION_GUIDE.md)**
+
+---
+
+## Docker Quick Start
 
 **New!** The entire pipeline is now containerized for easy deployment without manual dependency installation.
 
