@@ -22,6 +22,7 @@ from modules.helm_deployer import HelmDeployer
 from modules.prometheus_client import PrometheusClient
 from modules.benchmark_runner import BenchmarkRunner
 from modules.artifact_generator import ArtifactGenerator
+from modules.machine_specs import enrich_cluster_info
 
 # Configure logging
 logging.basicConfig(
@@ -112,9 +113,10 @@ class BenchmarkOrchestrator:
             # Setup port-forward for metrics collection
             prometheus_forward = self.helm.setup_prometheus_access()
 
-            # Update Prometheus URL to use localhost
+            # Update Prometheus URL to use localhost with proper namespace configuration
             self.prometheus = PrometheusClient({
-                'prometheus_url': 'http://localhost:9090'
+                'prometheus_url': 'http://localhost:9090',
+                'namespace': 'default'
             })
             logger.info(f"Monitoring deployed. Grafana URL: {monitoring_info.get('grafana_url')}")
             
@@ -131,12 +133,14 @@ class BenchmarkOrchestrator:
             logger.info("Benchmark completed")
             
             # Step 6: Collect metrics from Prometheus
-            logger.info("Step 6: Collecting metrics from Prometheus...")
+            logger.info("Step 6: Collecting comprehensive metrics from Prometheus...")
             metrics = self.prometheus.collect_metrics(
                 start_time=benchmark_results['start_time'],
                 end_time=benchmark_results['end_time']
             )
-            logger.info(f"Collected {len(metrics)} metric series")
+            logger.info(f"Collected metrics: {metrics['summary'].get('total_pods', 0)} pods, "
+                       f"{metrics['summary'].get('total_nodes', 0)} nodes, "
+                       f"{metrics['summary'].get('total_services', 0)} services")
             
             # Step 7: Generate benchmark artifact
             logger.info("Step 7: Generating benchmark artifact...")
@@ -159,8 +163,22 @@ class BenchmarkOrchestrator:
             logger.info(f"Region: {self.config['region']}")
             logger.info(f"Zone: {self.config['zone']}")
             logger.info(f"Duration: {self.config['duration']}s")
-            logger.info(f"Artifact: {artifact_path}")
-            logger.info(f"Grafana: {monitoring_info.get('grafana_url')}")
+            logger.info(f"Load Profile: {self.config['users_count']} users @ {self.config['rps']} RPS")
+            logger.info("")
+            logger.info("Metrics Summary:")
+            logger.info(f"  - Pods monitored: {metrics['summary'].get('total_pods', 0)}")
+            logger.info(f"  - Nodes monitored: {metrics['summary'].get('total_nodes', 0)}")
+            logger.info(f"  - Services tracked: {metrics['summary'].get('total_services', 0)}")
+            logger.info(f"  - Avg CPU: {metrics['cluster'].get('avg_cpu_utilization', 0):.2f}%")
+            logger.info(f"  - CPU Throttling: {metrics['cluster'].get('cpu_throttled_percentage', 0):.2f}%")
+            logger.info("")
+            logger.info("Artifacts Generated:")
+            logger.info(f"  - Main artifact: {artifact_path}")
+            logger.info(f"  - Cluster summary: benchmarks/cluster_summary.csv")
+            logger.info(f"  - Per-pod metrics: benchmarks/{self.config['run_id']}_pods.csv")
+            logger.info(f"  - Per-node metrics: benchmarks/{self.config['run_id']}_nodes.csv")
+            logger.info("")
+            logger.info(f"Grafana Dashboard: {monitoring_info.get('grafana_url')}")
             logger.info("=" * 60)
             
             return {
