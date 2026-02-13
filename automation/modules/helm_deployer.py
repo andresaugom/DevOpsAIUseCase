@@ -156,26 +156,7 @@ class HelmDeployer:
         logger.info(f"Using values file: {values_file}")
         logger.info("Installing Prometheus stack (timeout: 15 minutes)...")
         logger.info("This includes Prometheus Operator, Grafana, and several components...")
-        
-        # Install with explicit timeout
-        import signal
-        import threading
-        
-        # Create a stop event for the progress thread
-        stop_event = threading.Event()
-        
-        # Create a timer to log progress
-        def log_progress():
-            elapsed = 0
-            while not stop_event.is_set() and elapsed < 900:  # 15 minutes
-                if stop_event.wait(60):  # Sleep 60s or until stopped
-                    break
-                elapsed += 60
-                logger.info(f"Still installing... ({elapsed//60} minutes elapsed)")
-        
-        progress_thread = threading.Thread(target=log_progress, daemon=True)
-        progress_thread.start()
-        
+       
         try:
             # Use upgrade --install for idempotent deployment
             self._run_helm_command([
@@ -206,11 +187,7 @@ class HelmDeployer:
                 pass
             
             raise RuntimeError("Prometheus deployment failed or timed out") from e
-        finally:
-            # Always stop the progress thread
-            stop_event.set()
-            progress_thread.join(timeout=2)
-        
+       
         # Get Grafana URL
         logger.info("Retrieving Grafana service URL...")
         grafana_url = self._get_service_url('monitoring', 'prometheus-grafana')
