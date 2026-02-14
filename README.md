@@ -123,11 +123,11 @@ gcloud iam service-accounts add-iam-policy-binding \
   --project=${GCP_PROJECT_ID}
 
 # 5. Create and download key
-gcloud iam service-accounts keys create ~/devops-benchmark-key.json \
+gcloud iam service-accounts keys create ./key.json \
   --iam-account=devops-benchmark@${GCP_PROJECT_ID}.iam.gserviceaccount.com
 
 # 6. Set environment variable
-export GOOGLE_APPLICATION_CREDENTIALS=~/devops-benchmark-key.json
+export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/key.json
 
 # 7. Enable required APIs
 gcloud services enable container.googleapis.com
@@ -470,7 +470,7 @@ gcloud auth application-default login
 gcloud config set project ${GCP_PROJECT_ID}
 
 # Or re-export service account credentials
-export GOOGLE_APPLICATION_CREDENTIALS=~/devops-benchmark-key.json
+export GOOGLE_APPLICATION_CREDENTIALS=~$(pwd)/key.json
 
 # Verify authentication
 gcloud auth list
