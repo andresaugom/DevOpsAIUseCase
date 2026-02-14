@@ -1,5 +1,29 @@
 # Getting Started Guide
 
+> **📌 NOTE:** This guide has been consolidated into the main [README.md](../README.md) file.  
+> **For the best getting started experience, please refer to the [Quick Start section in README.md](../README.md#quick-start---run-your-first-benchmark).**
+
+This document is archived for reference but may contain outdated information.
+
+---
+
+## Quick Links
+
+- **[Main README - Quick Start](../README.md#quick-start---run-your-first-benchmark)** - Comprehensive getting started guide with Docker-first approach
+- **[Quick Reference Card](QUICK_REFERENCE.md)** - Command cheat sheet
+- **[Docker Guide](DOCKER.md)** - Detailed Docker usage and troubleshooting
+- **[Architecture Documentation](ARCHITECTURE.md)** - System design and components
+
+---
+
+## Original Guide (Archived)
+
+_The content below has been consolidated into README.md and may be outdated._
+
+---
+
+# Getting Started Guide (Archived)
+
 This guide will help you set up and run your first benchmark.
 
 ## Prerequisites

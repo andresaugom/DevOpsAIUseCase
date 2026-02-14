@@ -65,9 +65,80 @@
 ![Pipeline Usage Flow](docs/PIPELINE_USAGE_SIMPLIFIED.png)
 
 ### Prerequisites
-- Docker installed
-- Cloud provider credentials configured (GCP default)
-- 15-20 minutes for complete run
+
+#### Required Software
+- **Docker** (that's it! Everything else is containerized)
+- 15-20 minutes for complete benchmark run
+
+#### Cloud Provider Setup (GCP)
+
+Before running benchmarks, set up your Google Cloud Platform credentials:
+
+**Option 1: Using gcloud CLI (Recommended for Development)**
+
+```bash
+# 1. Install gcloud CLI (if not installed)
+# Visit: https://cloud.google.com/sdk/docs/install
+
+# 2. Authenticate and set up application default credentials
+gcloud auth login
+gcloud auth application-default login
+
+# 3. Set your project
+export GCP_PROJECT_ID="your-project-id"
+gcloud config set project ${GCP_PROJECT_ID}
+
+# 4. Enable required APIs
+gcloud services enable container.googleapis.com
+gcloud services enable compute.googleapis.com
+
+# 5. Verify authentication
+gcloud auth list
+```
+
+**Option 2: Using Service Account (Recommended for Production/CI/CD)**
+
+```bash
+# 1. Set your project ID
+export GCP_PROJECT_ID="your-project-id"
+
+# 2. Create service account
+gcloud iam service-accounts create devops-benchmark \
+  --display-name="DevOps Benchmark Automation"
+
+# 3. Grant Container Admin permissions
+gcloud projects add-iam-policy-binding ${GCP_PROJECT_ID} \
+  --member="serviceAccount:devops-benchmark@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/container.admin"
+
+# 4. Grant Service Account User permissions
+# Get your project number
+PROJECT_NUMBER=$(gcloud projects describe ${GCP_PROJECT_ID} --format='value(projectNumber)')
+
+# Grant the required role
+gcloud iam service-accounts add-iam-policy-binding \
+  ${PROJECT_NUMBER}-compute@developer.gserviceaccount.com \
+  --member="serviceAccount:devops-benchmark@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser" \
+  --project=${GCP_PROJECT_ID}
+
+# 5. Create and download key
+gcloud iam service-accounts keys create ~/devops-benchmark-key.json \
+  --iam-account=devops-benchmark@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+
+# 6. Set environment variable
+export GOOGLE_APPLICATION_CREDENTIALS=~/devops-benchmark-key.json
+
+# 7. Enable required APIs
+gcloud services enable container.googleapis.com
+gcloud services enable compute.googleapis.com
+```
+
+**AWS/Azure Setup (Future Support)**
+
+Refer to [Docker Guide](docs/DOCKER.md) for AWS and Azure credential setup when implemented.
+
+---
 
 ### How It Works: Responsibility Matrix
 
@@ -80,10 +151,12 @@
 
 **Key Point:** The **Python CLI is your primary interface**. It orchestrates Terraform, Helm, and Prometheus automatically. You don't need to run Terraform commands manually unless you want advanced infrastructure customization.
 
+---
+
 ### One-Command Benchmark
 
 ```bash
-# Set your GCP project
+# Set your GCP project (if not already set)
 export GCP_PROJECT_ID="your-project-id"
 
 # Run benchmark (builds image, provisions cluster, collects metrics, and cleans up)
@@ -91,12 +164,15 @@ export GCP_PROJECT_ID="your-project-id"
 ```
 
 **What happens:**
-1. Provisions GKE cluster with 3 nodes (n2-standard-4)
-2. Deploys Online Boutique + Prometheus + Grafana
-3. Runs 10-minute benchmark with 300 users at 50 RPS
-4. Collects detailed metrics (cluster, per-pod, per-node)
-5. Generates artifacts: `gcp-intel-YYYYMMDD-HHMMSS.json` + 3 CSV files
-6. Destroys infrastructure (with `--cleanup`)
+1. Builds Docker image with all dependencies (if `--build` flag used)
+2. Provisions GKE cluster with 3 nodes (n2-standard-4) - ~8-10 minutes
+3. Deploys Online Boutique + Prometheus + Grafana - ~5-7 minutes
+4. Runs 10-minute benchmark with 300 users at 50 RPS
+5. Collects detailed metrics (cluster, per-pod, per-node) - ~1-2 minutes
+6. Generates artifacts: `gcp-intel-YYYYMMDD-HHMMSS.json` + 3 CSV files
+7. Destroys infrastructure (with `--cleanup`) - ~5-8 minutes
+
+**Total time**: ~30 minutes for complete run
 
 ### View Results
 
@@ -109,7 +185,36 @@ open benchmarks/gcp-intel-*_pods.csv
 
 # Grafana dashboard (during benchmark)
 # URL shown in console output: http://localhost:3000
+# Default credentials: admin/admin
 ```
+
+### Alternative: Run Without Docker (Manual Setup)
+
+If you prefer not to use Docker, you can run the Python orchestrator directly:
+
+**Prerequisites:**
+- Python 3.11+
+- Terraform >= 1.7
+- kubectl >= 1.29
+- Helm >= 3.14
+- gcloud CLI
+
+**Install Python dependencies:**
+```bash
+cd automation
+pip install -r requirements.txt
+```
+
+**Run benchmark:**
+```bash
+python main.py \
+  --cloud gcp \
+  --machine-type n2-standard-4 \
+  --duration 600 \
+  --cleanup
+```
+
+**Note:** Docker is recommended because it ensures consistent tool versions and eliminates "works on my machine" issues.
 
 ### Usage Patterns
 
@@ -160,6 +265,301 @@ terraform apply
 - Breaks reproducibility guarantees
 
 **Bottom line:** Use Pattern 1 for benchmarking (the primary use case). Only use Pattern 2 if you need infrastructure customization beyond what the orchestrator exposes.
+
+---
+
+### Step-by-Step Process (For More Control)
+
+If you want to control each phase of the benchmark separately:
+
+#### Phase 1: Provision Infrastructure Only
+
+```bash
+./benchmark.sh gcp n2-standard-4 600 --build --skip-provision
+# Then manually run:
+cd terraform/gcp
+terraform init
+terraform apply
+```
+
+Or let the orchestrator provision but keep the cluster:
+
+```bash
+python automation/main.py \
+  --cloud gcp \
+  --machine-type n2-standard-4 \
+  --skip-benchmark
+```
+
+#### Phase 2: Access Grafana Dashboard
+
+```bash
+# Get Grafana service details
+kubectl get service -n monitoring prometheus-grafana
+
+# Port-forward to access locally
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+```
+
+Visit http://localhost:3000
+- **Username**: `admin`
+- **Password**: `admin` (change on first login)
+
+#### Phase 3: Run Benchmark on Existing Cluster
+
+```bash
+python automation/main.py \
+  --cloud gcp \
+  --machine-type n2-standard-4 \
+  --duration 600 \
+  --skip-provision
+```
+
+#### Phase 4: Manual Cleanup
+
+```bash
+python automation/main.py --cloud gcp --cleanup-only
+
+# Or use Terraform directly:
+cd terraform/gcp
+terraform destroy
+```
+
+---
+
+### Understanding Benchmark Output
+
+Each benchmark run generates **4 artifact files** in the `benchmarks/` directory:
+
+#### 1. Complete Metrics JSON (`<cloud>-<vendor>-<timestamp>.json`)
+
+```json
+{
+  "run_id": "gcp-intel-20260213-143022",
+  "timestamp": "2026-02-13T14:30:22",
+  "cloud": "gcp",
+  "region": "us-central1",
+  "zone": "us-central1-a",
+  "node_pool": {
+    "machine_type": "n2-standard-4",
+    "cpu_vendor": "intel",
+    "cpu_generation": "Ice Lake",
+    "node_count": 3,
+    "machine_specs": {
+      "vcpus": 4,
+      "memory_gb": 16,
+      "cpu_platform": "Intel Ice Lake"
+    }
+  },
+  "load_profile": {
+    "duration_seconds": 600,
+    "users_count": 300,
+    "rps": 50
+  },
+  "metrics": {
+    "cpu": {
+      "avg_utilization_pct": 6.57,
+      "max_utilization_pct": 17.84,
+      "p95_utilization_pct": 16.21
+    }
+  },
+  "pods": [ /* Individual pod metrics */ ],
+  "nodes": [ /* Individual node metrics */ ]
+}
+```
+
+#### 2. Cluster Summary CSV (`cluster_summary.csv`)
+
+Quick comparison view for importing into Excel/Google Sheets:
+- Run ID, timestamp, cloud provider
+- Machine type, CPU vendor/generation
+- Average CPU/memory metrics
+- Normalized metrics (per-request)
+
+#### 3. Per-Node Metrics CSV (`<run-id>_nodes.csv`)
+
+Infrastructure-level metrics for each Kubernetes node:
+- Node name, machine type
+- CPU utilization (avg, max, P95)
+- Memory usage
+- Network I/O
+
+#### 4. Per-Pod Metrics CSV (`<run-id>_pods.csv`)
+
+Application-level metrics for each pod/container:
+- Pod/container names
+- CPU utilization and throttling
+- Memory usage
+- Ideal for identifying bottlenecks
+
+**Analysis Tips:**
+```bash
+# View overall metrics
+cat benchmarks/gcp-intel-*.json | jq '.metrics'
+
+# Find CPU hotspots (sort by CPU usage)
+cat benchmarks/*_pods.csv | sort -t',' -k3 -nr | head -10
+
+# Compare two benchmark runs
+diff <(jq .metrics.cpu benchmarks/gcp-intel-*.json) \
+     <(jq .metrics.cpu benchmarks/gcp-amd-*.json)
+```
+
+---
+
+### Cost Considerations
+
+**Estimated GCP Costs per Benchmark Run:**
+
+| Machine Type | Cores | Cost/Hour | 3 Nodes/Hour | 30-Min Benchmark |
+|--------------|-------|-----------|--------------|------------------|
+| n2-standard-4 | 4 | ~$0.19 | ~$0.57 | ~$0.29 |
+| n2-standard-8 | 8 | ~$0.39 | ~$1.17 | ~$0.59 |
+| n2d-standard-4 | 4 | ~$0.17 | ~$0.51 | ~$0.26 |
+| t2a-standard-4 | 4 | ~$0.13 | ~$0.39 | ~$0.20 |
+
+**Note:** Prices are approximate and vary by region. Actual costs include:
+- GKE cluster management fee: $0.10/hour
+- Network egress (minimal for benchmarks)
+- Load balancer (if external IPs used)
+
+**Cost-Saving Tips:**
+
+1. **Always use `--cleanup` flag** to delete resources after benchmarks:
+   ```bash
+   ./benchmark.sh gcp n2-standard-4 600 --cleanup
+   ```
+
+2. **Run benchmarks during off-peak hours** for potential discounts
+
+3. **Use preemptible nodes** (requires Terraform customization):
+   - 60-80% cheaper than regular nodes
+   - May be terminated early (acceptable for benchmarks)
+
+4. **Batch multiple runs** on the same cluster:
+   ```bash
+   # Provision once
+   python automation/main.py --cloud gcp --machine-type n2-standard-4 --skip-benchmark
+   
+   # Run multiple benchmarks with different load profiles
+   python automation/main.py --duration 300 --skip-provision --users-count 100
+   python automation/main.py --duration 300 --skip-provision --users-count 300
+   
+   # Cleanup when done
+   python automation/main.py --cleanup-only
+   ```
+
+5. **Set up billing alerts** in GCP Console to avoid unexpected charges
+
+**Daily Benchmarking Cost Estimate:**
+- 4 benchmark runs (30 min each): ~$1.00-$2.50/day
+- 20 runs/month: ~$5-$12/month
+
+---
+
+### Getting Started Troubleshooting
+
+#### Authentication Issues
+
+**Problem:** "Permission denied" or "Could not find default credentials"
+
+**Solution:**
+```bash
+# Re-authenticate with gcloud
+gcloud auth application-default login
+gcloud config set project ${GCP_PROJECT_ID}
+
+# Or re-export service account credentials
+export GOOGLE_APPLICATION_CREDENTIALS=~/devops-benchmark-key.json
+
+# Verify authentication
+gcloud auth list
+```
+
+#### Cluster Already Exists
+
+**Problem:** "Error: a cluster named 'benchmark-cluster' already exists"
+
+**Solution:**
+```bash
+# Delete existing cluster
+cd terraform/gcp
+terraform destroy
+
+# Or use gcloud directly
+gcloud container clusters delete benchmark-cluster --zone us-central1-a
+```
+
+#### Pods Not Starting
+
+**Problem:** Pods stuck in "Pending" or "CrashLoopBackOff"
+
+**Solution:**
+```bash
+# Check pod status
+kubectl get pods --all-namespaces
+kubectl describe pod <pod-name> -n default
+
+# Common causes:
+# 1. Insufficient resources - increase node count or machine type
+# 2. Image pull errors - check network connectivity
+# 3. Resource quota exceeded - check node capacity
+
+# View node resources
+kubectl top nodes
+kubectl describe nodes
+```
+
+#### Prometheus Query Failed
+
+**Problem:** "Failed to collect metrics" or "Prometheus not responding"
+
+**Solution:**
+```bash
+# Verify Prometheus is running
+kubectl get pods -n monitoring
+
+# Check Prometheus logs
+kubectl logs -n monitoring prometheus-operated-0
+
+# Port-forward to test connectivity
+kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+# Visit http://localhost:9090
+```
+
+#### Docker Build Failed
+
+**Problem:** "Cannot build Docker image" or registry errors
+
+**Solution:**
+```bash
+# Clean Docker cache and rebuild
+docker system prune -a
+docker build --no-cache -t devops-benchmark:latest .
+
+# Verify Dockerfile exists
+ls -la Dockerfile
+```
+
+#### Insufficient Permissions
+
+**Problem:** "Error 403: Required 'container.clusters.create' permission"
+
+**Solution:**
+```bash
+# Check current permissions
+gcloud projects get-iam-policy ${GCP_PROJECT_ID}
+
+# Re-grant necessary roles
+gcloud projects add-iam-policy-binding ${GCP_PROJECT_ID} \
+  --member="serviceAccount:devops-benchmark@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/container.admin"
+```
+
+For more troubleshooting, see:
+- [Docker Guide](docs/DOCKER.md#troubleshooting) - Docker-specific issues
+- [Quick Reference](docs/QUICK_REFERENCE.md) - Common commands
+- [Architecture Docs](docs/ARCHITECTURE.md) - System design details
 
 ---
 
@@ -644,8 +1044,9 @@ DevOpsAIUseCase/
 ## Complete Documentation
 
 ### Getting Started
-- **[Getting Started Guide](docs/GETTING_STARTED.md)** - Step-by-step tutorial for first benchmark
-- **[Quick Reference](docs/QUICK_REFERENCE.md)** - Command cheat sheet
+This README now contains the complete getting started guide. For supplementary documentation:
+- **[Quick Reference](docs/QUICK_REFERENCE.md)** - Command cheat sheet and common operations
+- **[Getting Started (Archived)](docs/GETTING_STARTED.md)** - Historical reference (consolidated into this README)
 
 ### Technical Deep Dives  
 - **[System Architecture](docs/ARCHITECTURE.md)** - Infrastructure design, data flow, component interaction
@@ -851,51 +1252,82 @@ python -m json.tool benchmarks/gcp-amd-*.json | grep -A 10 '"metrics"'
 
 ## Troubleshooting
 
-### Common Issues
+For common issues and solutions, see the **[Getting Started Troubleshooting](#getting-started-troubleshooting)** section above, which covers:
 
-**1. "Permission denied" errors**
+- Authentication and permission issues
+- Cluster provisioning problems  
+- Pod deployment failures
+- Prometheus connectivity
+- Docker build errors
+- Insufficient permissions
+
+**Additional Resources:**
+- [Docker Guide - Troubleshooting](docs/DOCKER.md#troubleshooting) - Docker-specific issues
+- [Quick Reference](docs/QUICK_REFERENCE.md) - Command cheat sheet
+- [Architecture Documentation](docs/ARCHITECTURE.md) - System design details
+
+### Quick Fixes
+
 ```bash
-# Solution: Ensure GCP authentication
+# Re-authenticate with GCP
 gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID
-```
+gcloud config set project ${GCP_PROJECT_ID}
 
-**2. "Cluster already exists"**
-```bash
-# Solution: Destroy existing cluster
+# Rebuild Docker image
+docker build --no-cache -t devops-benchmark:latest .
+
+# Destroy and recreate cluster
 cd terraform/gcp && terraform destroy && cd ../..
-```
 
-**3. "Docker image not found"**
-```bash
-# Solution: Build the image
-docker build -t devops-benchmark:latest .
-```
-
-**4. Pods not starting**
-```bash
 # Check pod status
-kubectl get pods
-kubectl describe pod <pod-name>
+kubectl get pods --all-namespaces
+kubectl describe pod <pod-name> -n <namespace>
 
-# Common cause: Resource quota exceeded
-kubectl describe nodes
+# View logs
+kubectl logs -n default <pod-name>
+kubectl logs -n monitoring prometheus-operated-0
 ```
-
-**Full troubleshooting guide**: [docs/DOCKER.md](docs/DOCKER.md#troubleshooting)
 
 ---
 
 ## Understanding the Results
 
-### Artifact Files Explained
+For detailed information on benchmark output, see the **[Understanding Benchmark Output](#understanding-benchmark-output)** section above, which explains:
 
-Each benchmark run generates 4 files:
+- Complete Metrics JSON file structure
+- Cluster Summary CSV format
+- Per-Node Metrics CSV contents
+- Per-Pod Metrics CSV details
+- Analysis tips and commands
 
-1. **`<cloud>-<vendor>-<timestamp>.json`** - Complete metrics with metadata
-2. **`cluster_summary.csv`** - High-level comparison data
-3. **`<id>_nodes.csv`** - Per-node infrastructure metrics
-4. **`<id>_pods.csv`** - Per-pod application metrics
+### Quick Analysis
+
+```bash
+# View overall cluster metrics
+cat benchmarks/gcp-intel-*.json | jq '.metrics'
+
+# Find CPU hotspots (top 10 pods by CPU)
+cat benchmarks/*_pods.csv | sort -t',' -k3 -nr | head -10
+
+# Compare two benchmark runs
+diff <(jq .metrics.cpu benchmarks/gcp-intel-*.json) \
+     <(jq .metrics.cpu benchmarks/gcp-amd-*.json)
+```
+
+### Key Metrics for Comparison
+
+| Metric | What It Means | Good Value |
+|--------|---------------|------------|
+| `avg_utilization_pct` | Average CPU across all pods | 40-80% |
+| `max_utilization_pct` | Peak CPU (bottleneck indicator) | < 90% |
+| `p95_utilization_pct` | 95th percentile CPU (steady-state) | < 85% |
+| `throttled_percentage` | % of time CPU was throttled | < 5% |
+| `avg_usage_mb` | Average memory consumption | Varies by app |
+
+**Analysis Tips:**
+- **High throttling (>10%)**: CPU limits too low or processor underperforming
+- **Low utilization (<30%)**: Over-provisioned resources or efficient processor
+- **Compare P95 values**: More reliable than max for steady-state comparison
 
 ### Sample Analysis Workflow
 

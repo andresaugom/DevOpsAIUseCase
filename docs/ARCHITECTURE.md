@@ -1,11 +1,32 @@
-# System Architecture Diagram
+# System Architecture Documentation
+
+> **Last Updated:** February 2026 | **Version:** 2.0 (Enhanced Metrics)
+
+## Overview
+
+This document describes the architecture of the **Cloud-Agnostic Performance Benchmarking Platform**, a fully Dockerized system that automates infrastructure provisioning, application deployment, and performance analysis for processor comparison across cloud providers.
+
+**Key Features:**
+- 🐳 **Fully containerized** with pinned tool versions
+- 📊 **Enhanced metrics v2.0** with per-pod and per-node granularity
+- 🔄 **One-command execution** via Docker wrapper (`benchmark.sh`)
+- 🌐 **Cloud-agnostic** design (GCP production-ready, AWS/Azure templated)
+- 📈 **4-file artifact output** for comprehensive analysis
+
+---
 
 ## Overall System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         BENCHMARK ORCHESTRATION LAYER                        │
+│                          USER INTERFACE LAYER                                │
 │                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │              Docker Container (benchmark.sh wrapper)                │    │
+│  │  All dependencies included: Terraform, Helm, kubectl, gcloud, etc.  │    │
+│  │  Pinned versions: TF 1.7.5, Helm 3.14.0, kubectl 1.29.2            │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                    ▼                                         │
 │  ┌────────────────────────────────────────────────────────────────────┐    │
 │  │                      Python Orchestrator (main.py)                  │    │
 │  │                                                                     │    │
@@ -16,27 +37,34 @@
 │  │                                                                     │    │
 │  │  ┌──────────────┐  ┌──────────────────────────────────┐          │    │
 │  │  │  Benchmark   │  │      Artifact Generator          │          │    │
-│  │  │   Runner     │  │   (JSON/CSV output)              │          │    │
+│  │  │   Runner     │  │   (4-file output: JSON + 3 CSVs) │          │    │
 │  │  └──────────────┘  └──────────────────────────────────┘          │    │
+│  │                                                                     │    │
+│  │  ┌──────────────────────────────────────────────────────┐         │    │
+│  │  │      Machine Specs (GCP metadata enrichment)          │         │    │
+│  │  │  CPU vendor, generation, vCPUs, memory, bandwidth     │         │    │
+│  │  └──────────────────────────────────────────────────────┘         │    │
 │  └────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
 └───────────────┬────────────────────────────────────────────┬────────────────┘
                 │                                            │
                 ▼                                            ▼
 ┌───────────────────────────────────┐    ┌──────────────────────────────────┐
-│    INFRASTRUCTURE LAYER           │    │     BENCHMARK ARTIFACTS          │
+│    INFRASTRUCTURE LAYER           │    │     BENCHMARK ARTIFACTS (v2.0)   │
 │                                   │    │                                  │
 │  ┌─────────────────────────────┐ │    │  ┌────────────────────────────┐ │
-│  │   Terraform (IaC)           │ │    │  │  benchmarks/*.json         │ │
-│  │                             │ │    │  │  - Machine metadata        │ │
-│  │  ┌──────┐  ┌──────┐        │ │    │  │  - Performance metrics     │ │
-│  │  │ GCP  │  │ AWS  │ ...    │ │    │  │  - Normalized results      │ │
+│  │   Terraform (IaC)           │ │    │  │  <cloud>-<vendor>-<ts>.json│ │
+│  │                             │ │    │  │  - Complete metrics        │ │
+│  │  ┌──────┐  ┌──────┐        │ │    │  │  - Machine specs           │ │
+│  │  │ GCP  │  │ AWS  │ ...    │ │    │  │  - Per-pod data            │ │
+│  │  │ ✅    │  │  📋  │        │ │    │  │  - Per-node data           │ │
 │  │  └──────┘  └──────┘        │ │    │  └────────────────────────────┘ │
 │  │                             │ │    │                                  │
 │  │  Creates:                   │ │    │  ┌────────────────────────────┐ │
-│  │  - Kubernetes clusters      │ │    │  │  benchmarks/*.csv          │ │
-│  │  - Fixed node pools         │ │    │  │  - Comparison-ready format │ │
-│  │  - Node labels (CPU info)   │ │    │  └────────────────────────────┘ │
+│  │  - Kubernetes clusters      │ │    │  │  cluster_summary.csv       │ │
+│  │  - Fixed node pools         │ │    │  │  <run-id>_nodes.csv        │ │
+│  │  - Node labels (CPU info)   │ │    │  │  <run-id>_pods.csv         │ │
+│  │  - Auto-generated .tfvars   │ │    │  └────────────────────────────┘ │
 │  └─────────────────────────────┘ │    │                                  │
 └───────────────┬───────────────────┘    └──────────────────────────────────┘
                 │
@@ -510,7 +538,6 @@ package "Kubernetes Cluster" {
     package "monitoring namespace" <<namespace>> {
         component "Prometheus" as Prom <<monitoring>>
         component "Grafana" as Graf <<monitoring>>
-        component "Grafana AI\nAgent" as GrafAI <<monitoring>>
         component "Node\nExporter" as NodeExp <<monitoring>>
         component "Kube State\nMetrics" as KubeMet <<monitoring>>
         component "cAdvisor" as cAdv <<monitoring>>
@@ -557,8 +584,6 @@ KubeMet --> Prom : K8s metrics
 cAdv --> Prom : container metrics
 
 Graf --> Prom : queries
-GrafAI --> Prom : AI queries
-GrafAI --> Graf : integrated
 
 ' Node placement
 Frontend -[hidden]-> Node1
@@ -573,23 +598,17 @@ note right of NodePool
   - CPU vendor labeled
   - No autoscaling
   - Single zone
+  - Pinned Kubernetes version
 end note
 
 note right of Prom
-  Metrics collected:
-  - CPU utilization
-  - Memory usage
+  Metrics collected (v2.0):
+  - CPU utilization (cluster, pod, node)
+  - Memory usage (all levels)
+  - CPU throttling (per-pod)
   - Request rates
-  - Latency (P50, P95, P99)
-  - Error rates
-end note
-
-note right of GrafAI
-  Grafana AI provides:
-  - Context-aware insights
-  - Dashboard assistance
-  - Query optimization
-  - Anomaly explanation
+  - Network I/O
+  - 30s scrape interval
 end note
 
 @enduml
@@ -613,37 +632,54 @@ These diagrams can be embedded in documentation, presentations, or exported as P
 
 ```
 1. User initiates benchmark
-   └─> Python Orchestrator
+   └─> Docker Container (benchmark.sh wrapper)
+        └─> Python Orchestrator (main.py)
 
 2. Provision infrastructure
    └─> Terraform creates K8s cluster with fixed config
+       - Auto-generates terraform.tfvars from CLI args
+       - Provisions GKE with n2/n2d/t2a nodes
+       - Applies CPU vendor labels
 
 3. Deploy applications
    ├─> Helm deploys Online Boutique
-   └─> Helm deploys Prometheus/Grafana
+   └─> Helm deploys Prometheus/Grafana stack
 
 4. Execute benchmark
    └─> Load generator creates traffic for N seconds
+       - Configurable users (default: 300)
+       - Configurable RPS (default: 50)
 
-5. Collect metrics
+5. Collect metrics (v2.0 Enhanced)
    └─> Python queries Prometheus API (PromQL)
+       - Cluster-level aggregates
+       - Per-pod granular metrics
+       - Per-node infrastructure metrics
+       - Machine specs enrichment
 
-6. Generate artifacts
-   ├─> JSON file with complete results
-   └─> CSV file for easy comparison
+6. Generate artifacts (4 files)
+   ├─> Complete JSON with all data
+   ├─> Cluster summary CSV (quick comparison)
+   ├─> Per-node CSV (infrastructure view)
+   └─> Per-pod CSV (application bottlenecks)
 
-7. Analyze (Future)
-   └─> AI Agent provides insights
+7. Cleanup (optional)
+   └─> Terraform destroys all resources
+
+8. Analyze (Future)
+   └─> AI Agent provides insights from artifacts
 ```
 
 ## Key Design Principles
 
-1. **Reproducibility**: Fixed configurations ensure comparable results
-2. **Cloud-agnostic**: Kubernetes abstraction enables portability
-3. **Automation-first**: Minimal manual intervention
-4. **Separation of concerns**: Distinct tools for distinct tasks
-5. **Observability**: Comprehensive metrics collection
-6. **Extensibility**: Modular design supports future enhancements
+1. **Reproducibility**: Fixed configurations and pinned tool versions ensure comparable results
+2. **Containerization**: Docker eliminates "works on my machine" problems
+3. **Cloud-agnostic**: Kubernetes abstraction enables portability
+4. **Automation-first**: One command from setup to results
+5. **Separation of concerns**: Distinct tools for distinct tasks (Terraform/Helm/Python)
+6. **Observability**: Comprehensive metrics collection at multiple granularities
+7. **Extensibility**: Modular design supports future enhancements
+8. **Version Control**: Pinned dependencies (Terraform 1.7.5, Helm 3.14.0, kubectl 1.29.2)
 
 ## Network Topology
 
@@ -694,20 +730,38 @@ These diagrams can be embedded in documentation, presentations, or exported as P
 
 ```
 DevOpsAIUseCase/
-├── terraform/              # Infrastructure as Code
-│   ├── gcp/               # GCP configuration (implemented)
-│   ├── aws/               # AWS configuration (template)
-│   └── azure/             # Azure configuration (template)
-├── kubernetes/            # K8s manifests and Helm values
-│   ├── online-boutique/   # Application deployment
-│   └── monitoring/        # Prometheus + Grafana
-├── automation/            # Python orchestration
-│   ├── main.py           # Entry point
-│   ├── modules/          # Automation modules
-│   └── requirements.txt  # Dependencies
-├── benchmarks/           # Output artifacts (JSON/CSV)
-├── docs/                 # Documentation
-│   ├── diagrams/         # Architecture diagrams
+├── Dockerfile                 # Complete pipeline containerization
+├── docker-compose.yml         # Optional: Compose configuration
+├── benchmark.sh               # Docker wrapper script (primary interface)
+├── .dockerignore              # Docker build exclusions
+├── terraform/                 # Infrastructure as Code
+│   ├── gcp/                  # GCP configuration (✅ production-ready)
+│   ├── aws/                  # AWS configuration (📋 template)
+│   └── azure/                # Azure configuration (📋 template)
+├── kubernetes/                # K8s manifests and Helm values
+│   ├── online-boutique/      # Application deployment
+│   └── monitoring/           # Prometheus + Grafana
+├── automation/                # Python orchestration
+│   ├── main.py              # Entry point
+│   ├── modules/             # Automation modules
+│   │   ├── terraform_executor.py
+│   │   ├── helm_deployer.py
+│   │   ├── prometheus_client.py
+│   │   ├── benchmark_runner.py
+│   │   ├── artifact_generator.py
+│   │   └── machine_specs.py     # ✨ GCP machine metadata (v2.0)
+│   └── requirements.txt     # Python dependencies
+├── benchmarks/                # Output artifacts (4 files per run)
+│   ├── <cloud>-<vendor>-<timestamp>.json
+│   ├── cluster_summary.csv
+│   ├── <run-id>_nodes.csv
+│   └── <run-id>_pods.csv
+├── docs/                      # Documentation
+│   ├── ARCHITECTURE.md       # This file
+│   ├── DOCKER.md             # Docker usage guide
+│   ├── IMPLEMENTATION.md     # Implementation status
+│   ├── QUICK_REFERENCE.md    # Command cheat sheet
+│   ├── GETTING_STARTED.md    # (Archived - see README)
 │   └── AI_AGENT_ARCHITECTURE.md
-└── README.md            # Project overview
+└── README.md                  # Comprehensive guide (consolidated)
 ```
