@@ -85,7 +85,19 @@ class TerraformExecutor:
         return outputs
     
     def _create_tfvars(self):
-        """Create terraform.tfvars file from config"""
+        """Create terraform.tfvars file from config
+        
+        Design Decision: Auto-generate terraform.tfvars
+        ------------------------------------------------
+        The orchestrator dynamically creates terraform.tfvars on every run to ensure:
+        1. Consistency: CLI arguments directly map to Terraform variables (no config drift)
+        2. Simplicity: Users configure once via CLI, not in multiple places
+        3. Reproducibility: Each benchmark run has a unique cluster name with timestamp
+        
+        This means any existing terraform.tfvars will be OVERWRITTEN. This is intentional.
+        If users need custom infrastructure, they should run Terraform manually (without
+        the orchestrator), but they'll lose automated metrics collection and artifacts.
+        """
         tfvars_path = self.terraform_dir / 'terraform.tfvars'
         
         if self.cloud == 'gcp':

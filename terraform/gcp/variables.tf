@@ -1,4 +1,9 @@
 # Variables for GCP Kubernetes Cluster
+#
+# NOTE: These variables are automatically configured by the Python orchestrator.
+# The orchestrator generates terraform.tfvars dynamically based on CLI arguments.
+# You typically don't need to modify these unless running Terraform manually.
+# For normal benchmarking, use: python automation/main.py --help
 
 variable "project_id" {
   description = "GCP Project ID"

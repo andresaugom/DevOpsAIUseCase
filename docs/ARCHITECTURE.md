@@ -127,17 +127,88 @@
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Control Flow & Responsibilities
+
+### Who Manages What?
+
+This diagram clarifies the separation of concerns between components:
+
+```
+User Command:
+  python automation/main.py --cloud gcp --machine-type n2-standard-4 --duration 600
+
+                            ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Python Orchestrator (automation/main.py)                       │
+│ ├─ Parses CLI arguments                                        │
+│ ├─ Generates benchmark run ID                                  │
+│ └─ Orchestrates entire pipeline                                │
+└─────┬──────────────────────┬──────────────────┬────────────────┘
+      │                      │                  │
+      ▼                      ▼                  ▼
+┌─────────────┐    ┌──────────────────┐   ┌────────────────┐
+│  Terraform  │    │      Helm        │   │  Prometheus    │
+│  Executor   │    │    Deployer      │   │    Client      │
+└─────┬───────┘    └────┬─────────────┘   └────┬───────────┘
+      │                 │                      │
+      │ Creates         │ Deploys to          │ Queries
+      │ terraform.tfvars│ existing cluster    │ metrics from
+      │ Runs: init,     │                     │ running cluster
+      │ plan, apply     │                     │
+      ▼                 ▼                      ▼
+┌──────────────┐   ┌─────────────────┐   ┌──────────────────┐
+│ Terraform    │   │  Applications   │   │  Time-series     │
+│ (main.tf)    │   │  - Boutique     │   │  Metrics         │
+│ Provisions:  │   │  - Prometheus   │   │  - CPU/Memory    │
+│ - GKE cluster│   │  - Grafana      │   │  - Network       │
+│ - Node pools │   │                 │   │  - Throttling    │
+└──────────────┘   └─────────────────┘   └──────────────────┘
+```
+
+### Responsibility Matrix
+
+| Component | Manages | Input Source | Configuration Method | Can Run Standalone? |
+|-----------|---------|--------------|---------------------|---------------------|
+| **Python Orchestrator** | End-to-end workflow, error handling, artifact generation | CLI arguments from user | `automation/main.py --help` | ✅ Yes (primary interface) |
+| **Terraform** | Kubernetes cluster lifecycle (create/destroy) | Auto-generated `terraform.tfvars` by Python | Python creates config dynamically | ⚠️ Yes, but not recommended* |
+| **Helm** | Application deployment to existing cluster | Orchestrator commands | Python calls helm commands | ❌ No (needs cluster from Terraform) |
+| **Prometheus** | Metrics scraping and storage | Helm deployment | Python queries via API | ❌ No (deployed by Helm) |
+
+\* *You can run Terraform manually, but you lose the automation, metrics collection, and artifact generation that make the benchmarking useful.*
+
+### Key Design Decisions
+
+1. **Python is the Primary Interface**
+   - Users interact only with `automation/main.py` CLI
+   - All configuration happens via CLI arguments
+   - Terraform, Helm, and Prometheus are internal tools
+
+2. **Terraform Configuration is Auto-Generated**
+   - Python creates `terraform.tfvars` on every run
+   - Ensures consistency between CLI args and infrastructure
+   - Eliminates configuration drift
+
+3. **Fixed Infrastructure Settings**
+   - Many Terraform settings are intentionally hardcoded (no autoscaling, fixed monitoring, etc.)
+   - This ensures reproducible benchmarks across runs
+   - Users control only what affects CPU performance: machine_type, node_count, region
+
+4. **Ephemeral Clusters**
+   - Clusters are created, tested, and destroyed
+   - No persistent infrastructure management needed
+   - Simplifies workflow and reduces costs
+
 ## Component Details
 
 ### 1. Orchestration Layer
-- **Python Scripts**: Main automation logic
-- **Modules**: Specialized components for each task
-- **Configuration**: Parameterized for different scenarios
+- **Python Scripts**: Main automation logic that drives the entire pipeline
+- **Modules**: Specialized components (TerraformExecutor, HelmDeployer, PrometheusClient)
+- **Configuration**: All settings come from CLI arguments, no config files needed
 
 ### 2. Infrastructure Layer
-- **Terraform**: Cloud-agnostic IaC
-- **Multi-cloud Support**: GCP (implemented), AWS/Azure (planned)
-- **Fixed Configuration**: Ensures reproducible benchmarks
+- **Terraform**: Provisions Kubernetes clusters via declarative IaC
+- **Multi-cloud Support**: GCP (implemented), AWS/Azure (templated, not implemented)
+- **Fixed Configuration**: Reproducibility over flexibility - many settings are intentionally immutable
 
 ### 3. Kubernetes Cluster
 - **Online Boutique**: Production-like microservices workload

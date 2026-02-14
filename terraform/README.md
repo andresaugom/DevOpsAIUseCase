@@ -2,6 +2,41 @@
 
 This directory contains Terraform configurations for provisioning Kubernetes clusters across different cloud providers for the Online Boutique benchmarking pipeline.
 
+## ⚠️ Important: How Terraform is Used in This Project
+
+**For most users:** You don't need to run Terraform commands directly. The **Python orchestrator** (`automation/main.py`) manages Terraform automatically:
+
+```bash
+# This is the recommended way to use this project:
+python automation/main.py --cloud gcp --machine-type n2-standard-4 --duration 600
+```
+
+The orchestrator will:
+1. Auto-generate `terraform.tfvars` from your CLI arguments
+2. Run `terraform init/plan/apply` automatically
+3. Deploy applications and collect metrics
+4. Destroy infrastructure when done (with `--cleanup`)
+
+**Why this design?**
+- Ensures configuration consistency (CLI args → Terraform vars)
+- Simplifies user experience (one interface instead of two)
+- Enables end-to-end automation (provision → benchmark → collect → cleanup)
+- Guarantees reproducible benchmarks
+
+**When to use Terraform directly:**
+- You need custom network configurations
+- You require advanced security settings
+- You're building a long-running development cluster
+- You need integration with existing infrastructure
+
+**Trade-off:** Running Terraform manually gives you more infrastructure control but loses the automated benchmarking pipeline. See [README.md](../README.md#usage-patterns) for details.
+
+---
+
+## Direct Terraform Usage (Advanced)
+
+If you've decided you need direct Terraform control (see warning above), follow these instructions:
+
 ## Prerequisites
 
 Before using Terraform to provision infrastructure, ensure you have:

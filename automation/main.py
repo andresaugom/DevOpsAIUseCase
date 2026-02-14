@@ -5,8 +5,28 @@ This is the main entry point for the benchmarking pipeline.
 It orchestrates infrastructure provisioning, application deployment,
 load testing, metrics collection, and artifact generation.
 
+Design Philosophy:
+-----------------
+This orchestrator is the PRIMARY INTERFACE for users. It coordinates Terraform,
+Helm, and Prometheus as internal tools. Users configure everything via CLI arguments,
+and the orchestrator ensures consistency across all components.
+
+Key Design Decisions:
+- Python CLI is the single source of configuration (not Terraform variables)
+- Terraform tfvars are auto-generated to match CLI arguments
+- Infrastructure settings are fixed for reproducible benchmarks
+- End-to-end automation: provision → deploy → test → collect → cleanup
+
+For advanced infrastructure customization beyond CLI options, users can run
+Terraform manually, but they lose the automated benchmarking pipeline.
+
 Usage:
+    # Automated benchmark (recommended):
     python main.py --cloud gcp --machine-type n2-standard-4 --duration 600
+    
+    # Compare multiple machine types:
+    python main.py --cloud gcp --machine-type n2-standard-4 --cleanup
+    python main.py --cloud gcp --machine-type n2d-standard-4 --cleanup
 """
 
 import argparse
