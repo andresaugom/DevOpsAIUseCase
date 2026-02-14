@@ -83,7 +83,6 @@ class HelmDeployer:
     def setup_prometheus_access(self):
         """Setup port-forward to access Prometheus from outside cluster"""
         import subprocess
-        import threading
         
         logger.info("Setting up port-forward to Prometheus...")
         
