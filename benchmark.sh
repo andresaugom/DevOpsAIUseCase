@@ -14,7 +14,6 @@ NC='\033[0m' # No Color
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="${DOCKER_IMAGE:-devops-benchmark:latest}"
-DOCKER_REGISTRY="${DOCKER_REGISTRY:-}"
 
 # Display usage
 usage() {
@@ -35,14 +34,16 @@ ${GREEN}Options:${NC}
   --cleanup-only         Only perform cleanup
   --cpu-vendor <vendor>  CPU vendor (intel, amd, arm) - default: intel
   --node-count <count>   Number of nodes - default: 3
+  --users-count <count>  Number of concurrent users - default: 100
+  --rps <rps>            Requests per second - default: 50
   --build                Build Docker image before running
-  --pull                 Pull Docker image before running
   --shell                Start interactive shell instead of benchmark
 
 ${GREEN}Environment Variables:${NC}
   GCP:
-    GCP_PROJECT_ID              Google Cloud Project ID
-    GOOGLE_APPLICATION_CREDENTIALS  Path to service account JSON (default: ~/.config/gcloud/application_default_credentials.json)
+    GCP_PROJECT_ID       Google Cloud Project ID (required)
+    
+  For GCP authentication, place service account key at: ./key.json
   
   AWS:
     AWS_ACCESS_KEY_ID           AWS Access Key
@@ -57,19 +58,16 @@ ${GREEN}Environment Variables:${NC}
 
 ${GREEN}Examples:${NC}
   # Run GCP benchmark
-  $0 gcp n2-standard-4 600 --cleanup
+  $0 gcp n2-standard-4 60 --cleanup
 
-  # Run with custom CPU vendor
-  $0 gcp n2d-standard-4 600 --cpu-vendor amd --cleanup
+  # Run with custom load
+  $0 gcp n2-standard-4 300 --users-count 300 --rps 50 --cleanup
 
   # Build image first, then run
   $0 gcp n2-standard-4 600 --build --cleanup
 
   # Interactive shell for debugging
   $0 gcp n2-standard-4 600 --shell
-
-  # Cleanup only
-  $0 gcp n2-standard-4 600 --cleanup-only
 
 EOF
     exit 1
@@ -99,55 +97,39 @@ build_image() {
     log_success "Image built successfully"
 }
 
-# Pull Docker image
-pull_image() {
-    if [ -n "${DOCKER_REGISTRY}" ]; then
-        log_info "Pulling Docker image: ${DOCKER_REGISTRY}/${IMAGE_NAME}"
-        docker pull "${DOCKER_REGISTRY}/${IMAGE_NAME}"
-        log_success "Image pulled successfully"
-    else
-        log_warning "DOCKER_REGISTRY not set, skipping pull"
-    fi
-}
-
-# Detect and validate credentials
+# Check credentials
 check_credentials() {
     local cloud=$1
     
     case ${cloud} in
         gcp)
             if [ -z "${GCP_PROJECT_ID}" ]; then
-                log_error "GCP_PROJECT_ID environment variable is required for GCP"
+                log_error "GCP_PROJECT_ID environment variable is required"
+                log_error "Export it: export GCP_PROJECT_ID=your-project-id"
                 exit 1
             fi
             
-            # Check for credentials
-            if [ -n "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
-                if [ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
-                    log_error "GOOGLE_APPLICATION_CREDENTIALS file not found: ${GOOGLE_APPLICATION_CREDENTIALS}"
-                    exit 1
-                fi
-                log_info "Using GCP credentials from: ${GOOGLE_APPLICATION_CREDENTIALS}"
-            elif [ -d "${HOME}/.config/gcloud" ]; then
-                log_info "Using GCP credentials from: ${HOME}/.config/gcloud"
-            else
-                log_warning "No GCP credentials found. Make sure to authenticate first:"
-                log_warning "  gcloud auth application-default login"
+            if [ ! -f "${SCRIPT_DIR}/key.json" ]; then
+                log_error "GCP service account key not found at: ${SCRIPT_DIR}/key.json"
+                log_error "Place your service account key at ./key.json"
+                exit 1
             fi
+            
+            log_info "Using GCP credentials from: ${SCRIPT_DIR}/key.json"
             ;;
         aws)
             if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
-                log_error "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for AWS"
+                log_error "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required"
                 exit 1
             fi
-            log_info "Using AWS credentials from environment variables"
+            log_info "Using AWS credentials from environment"
             ;;
         azure)
             if [ -z "${AZURE_SUBSCRIPTION_ID}" ]; then
-                log_error "AZURE_SUBSCRIPTION_ID is required for Azure"
+                log_error "AZURE_SUBSCRIPTION_ID is required"
                 exit 1
             fi
-            log_info "Using Azure credentials from environment variables"
+            log_info "Using Azure credentials from environment"
             ;;
         *)
             log_error "Unknown cloud provider: ${cloud}"
@@ -174,7 +156,6 @@ main() {
     
     local extra_args=()
     local do_build=false
-    local do_pull=false
     local do_shell=false
     
     # Parse options
@@ -182,10 +163,6 @@ main() {
         case $1 in
             --build)
                 do_build=true
-                shift
-                ;;
-            --pull)
-                do_pull=true
                 shift
                 ;;
             --shell)
@@ -204,65 +181,34 @@ main() {
         build_image
     fi
     
-    # Pull if requested
-    if [ "${do_pull}" = true ]; then
-        pull_image
-    fi
-    
     # Check credentials
     check_credentials "${cloud}"
     
     # Prepare Docker volumes
     local volumes=(
+        "-v" "${SCRIPT_DIR}/key.json:/root/.gcp/service-account-key.json:ro"
         "-v" "${SCRIPT_DIR}/benchmarks:/workspace/benchmarks"
     )
-    
-    # Mount cloud-specific credentials
-    case ${cloud} in
-        gcp)
-            if [ -n "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
-                volumes+=("-v" "${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro")
-            fi
-            if [ -d "${HOME}/.config/gcloud" ]; then
-                volumes+=("-v" "${HOME}/.config/gcloud:/root/.config/gcloud:ro")
-            fi
-            ;;
-        aws)
-            if [ -d "${HOME}/.aws" ]; then
-                volumes+=("-v" "${HOME}/.aws:/root/.aws:ro")
-            fi
-            ;;
-        azure)
-            if [ -d "${HOME}/.azure" ]; then
-                volumes+=("-v" "${HOME}/.azure:/root/.azure:ro")
-            fi
-            ;;
-    esac
-    
-    # Mount Terraform state directories for persistence
-    for tf_dir in gcp aws azure; do
-        local tf_path="${SCRIPT_DIR}/terraform/${tf_dir}"
-        if [ -d "${tf_path}" ]; then
-            mkdir -p "${tf_path}/.terraform"
-            volumes+=("-v" "${tf_path}/.terraform:/workspace/terraform/${tf_dir}/.terraform")
-        fi
-    done
     
     # Prepare environment variables
     local env_vars=(
         "-e" "GCP_PROJECT_ID=${GCP_PROJECT_ID}"
-        "-e" "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
-        "-e" "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
-        "-e" "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}"
-        "-e" "AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}"
-        "-e" "AZURE_TENANT_ID=${AZURE_TENANT_ID}"
-        "-e" "AZURE_CLIENT_ID=${AZURE_CLIENT_ID}"
-        "-e" "AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}"
     )
     
-    # Only set GOOGLE_APPLICATION_CREDENTIALS if file exists and was mounted
-    if [ -n "${GOOGLE_APPLICATION_CREDENTIALS}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
-        env_vars+=("-e" "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}")
+    # Add AWS/Azure env vars if needed
+    if [ "${cloud}" = "aws" ]; then
+        env_vars+=(
+            "-e" "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
+            "-e" "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
+            "-e" "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}"
+        )
+    elif [ "${cloud}" = "azure" ]; then
+        env_vars+=(
+            "-e" "AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}"
+            "-e" "AZURE_TENANT_ID=${AZURE_TENANT_ID}"
+            "-e" "AZURE_CLIENT_ID=${AZURE_CLIENT_ID}"
+            "-e" "AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}"
+        )
     fi
     
     # Run Docker container
@@ -270,6 +216,7 @@ main() {
     log_info "Cloud: ${cloud}"
     log_info "Machine Type: ${machine_type}"
     log_info "Duration: ${duration}s"
+    echo ""
     
     if [ "${do_shell}" = true ]; then
         log_info "Starting interactive shell..."
@@ -289,12 +236,15 @@ main() {
             "${extra_args[@]}"
     fi
     
-    if [ $? -eq 0 ]; then
+    local exit_code=$?
+    echo ""
+    
+    if [ ${exit_code} -eq 0 ]; then
         log_success "Benchmark completed successfully!"
         log_info "Results saved to: ${SCRIPT_DIR}/benchmarks/"
     else
-        log_error "Benchmark failed!"
-        exit 1
+        log_error "Benchmark failed with exit code: ${exit_code}"
+        exit ${exit_code}
     fi
 }
 
