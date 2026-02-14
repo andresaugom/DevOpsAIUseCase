@@ -1,0 +1,331 @@
+{
+  "run_id": "gcp-intel-20260214-041821",
+  "timestamp": "2026-02-14T04:33:47.347766",
+  "cloud": "gcp",
+  "region": "us-central1",
+  "zone": "us-central1-a",
+  "node_pool": {
+    "machine_type": "n2-standard-4",
+    "cpu_vendor": "intel",
+    "cpu_generation": "Ice Lake",
+    "node_count": 3,
+    "source": "configuration",
+    "machine_specs": {
+      "vcpus": 4,
+      "memory_gb": 16,
+      "cpu_platform": "Intel Ice Lake",
+      "max_bandwidth_gbps": 10
+    }
+  },
+  "load_profile": {
+    "duration_seconds": 30,
+    "start_time": "2026-02-14T04:33:01.877752",
+    "end_time": "2026-02-14T04:33:31.877837",
+    "users_count": 100,
+    "rps": 50
+  },
+  "metrics": {
+    "cpu": {
+      "avg_utilization_pct": 0.5812,
+      "max_utilization_pct": 1.9447,
+      "p95_utilization_pct": 1.6144,
+      "p99_utilization_pct": 1.8786,
+      "throttled_seconds": 0.0,
+      "throttled_percentage": 0.0
+    },
+    "memory": {
+      "avg_usage_mb": 30.3492,
+      "max_usage_mb": 87.3945,
+      "avg_utilization_pct": 0.0
+    },
+    "network": {
+      "received_mb_per_sec": 0.0805,
+      "transmitted_mb_per_sec": 0.0766
+    },
+    "request_rate_rps": 0.0
+  },
+  "normalized_metrics": {
+    "cpu_seconds_per_request": 0.0,
+    "memory_mb_per_request": 0.0
+  },
+  "pods": [
+    {
+      "pod_name": "cartservice-574cf68969-szbj8",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.5913,
+          "max_utilization_pct": 0.6863,
+          "min_utilization_pct": 0.4333,
+          "p95_utilization_pct": 0.6831,
+          "p99_utilization_pct": 0.6856,
+          "std_dev": 0.1378
+        },
+        "memory": {
+          "avg_usage_mb": 46.1628,
+          "max_usage_mb": 46.3164,
+          "min_usage_mb": 46.0586,
+          "p95_usage_mb": 46.2961
+        }
+      }
+    },
+    {
+      "pod_name": "shippingservice-67768cd4c6-xq27k",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.0879,
+          "max_utilization_pct": 0.1116,
+          "min_utilization_pct": 0.0666,
+          "p95_utilization_pct": 0.109,
+          "p99_utilization_pct": 0.111,
+          "std_dev": 0.0226
+        },
+        "memory": {
+          "avg_usage_mb": 7.4466,
+          "max_usage_mb": 7.5664,
+          "min_usage_mb": 7.375,
+          "p95_usage_mb": 7.5496
+        }
+      }
+    },
+    {
+      "pod_name": "productcatalogservice-8485d7d86d-sgcxv",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.891,
+          "max_utilization_pct": 1.152,
+          "min_utilization_pct": 0.613,
+          "p95_utilization_pct": 1.1276,
+          "p99_utilization_pct": 1.1471,
+          "std_dev": 0.2699
+        },
+        "memory": {
+          "avg_usage_mb": 8.5521,
+          "max_usage_mb": 8.9258,
+          "min_usage_mb": 8.2578,
+          "p95_usage_mb": 8.8805
+        }
+      }
+    },
+    {
+      "pod_name": "recommendationservice-88dc45984-ms8j6",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.6212,
+          "max_utilization_pct": 0.8524,
+          "min_utilization_pct": 0.3903,
+          "p95_utilization_pct": 0.8292,
+          "p99_utilization_pct": 0.8477,
+          "std_dev": 0.231
+        },
+        "memory": {
+          "avg_usage_mb": 41.6836,
+          "max_usage_mb": 41.6953,
+          "min_usage_mb": 41.6758,
+          "p95_usage_mb": 41.6938
+        }
+      }
+    },
+    {
+      "pod_name": "loadgenerator-55c5d775d9-wtt4q",
+      "container_name": "main",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.4047,
+          "max_utilization_pct": 0.5383,
+          "min_utilization_pct": 0.2749,
+          "p95_utilization_pct": 0.5245,
+          "p99_utilization_pct": 0.5355,
+          "std_dev": 0.1317
+        },
+        "memory": {
+          "avg_usage_mb": 57.3672,
+          "max_usage_mb": 57.375,
+          "min_usage_mb": 57.3633,
+          "p95_usage_mb": 57.3738
+        }
+      }
+    },
+    {
+      "pod_name": "emailservice-75c448cdc6-lx4gw",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.04,
+          "max_utilization_pct": 0.0525,
+          "min_utilization_pct": 0.0264,
+          "p95_utilization_pct": 0.0513,
+          "p99_utilization_pct": 0.0522,
+          "std_dev": 0.0131
+        },
+        "memory": {
+          "avg_usage_mb": 42.6836,
+          "max_usage_mb": 42.6914,
+          "min_usage_mb": 42.6758,
+          "p95_usage_mb": 42.6906
+        }
+      }
+    },
+    {
+      "pod_name": "frontend-75d897db69-7k294",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 1.9447,
+          "max_utilization_pct": 2.4902,
+          "min_utilization_pct": 1.4068,
+          "p95_utilization_pct": 2.4349,
+          "p99_utilization_pct": 2.4791,
+          "std_dev": 0.5418
+        },
+        "memory": {
+          "avg_usage_mb": 14.9896,
+          "max_usage_mb": 15.1523,
+          "min_usage_mb": 14.8008,
+          "p95_usage_mb": 15.1387
+        }
+      }
+    },
+    {
+      "pod_name": "redis-cart-c8ff86559-gkjmz",
+      "container_name": "redis",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.0731,
+          "max_utilization_pct": 0.0978,
+          "min_utilization_pct": 0.0479,
+          "p95_utilization_pct": 0.0954,
+          "p99_utilization_pct": 0.0973,
+          "std_dev": 0.025
+        },
+        "memory": {
+          "avg_usage_mb": 5.1042,
+          "max_usage_mb": 5.2695,
+          "min_usage_mb": 5.0195,
+          "p95_usage_mb": 5.2449
+        }
+      }
+    },
+    {
+      "pod_name": "currencyservice-7df8bcbf94-j9w26",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 1.3441,
+          "max_utilization_pct": 1.7286,
+          "min_utilization_pct": 0.9732,
+          "p95_utilization_pct": 1.6888,
+          "p99_utilization_pct": 1.7206,
+          "std_dev": 0.3779
+        },
+        "memory": {
+          "avg_usage_mb": 29.0208,
+          "max_usage_mb": 29.1914,
+          "min_usage_mb": 28.7852,
+          "p95_usage_mb": 29.1809
+        }
+      }
+    },
+    {
+      "pod_name": "paymentservice-549dc89756-brhhg",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.0437,
+          "max_utilization_pct": 0.0559,
+          "min_utilization_pct": 0.0307,
+          "p95_utilization_pct": 0.0548,
+          "p99_utilization_pct": 0.0557,
+          "std_dev": 0.0126
+        },
+        "memory": {
+          "avg_usage_mb": 16.0339,
+          "max_usage_mb": 16.1367,
+          "min_usage_mb": 15.9531,
+          "p95_usage_mb": 16.1242
+        }
+      }
+    },
+    {
+      "pod_name": "checkoutservice-57dd9cf79b-dpz2m",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.1025,
+          "max_utilization_pct": 0.1283,
+          "min_utilization_pct": 0.0733,
+          "p95_utilization_pct": 0.126,
+          "p99_utilization_pct": 0.1278,
+          "std_dev": 0.0277
+        },
+        "memory": {
+          "avg_usage_mb": 7.7409,
+          "max_usage_mb": 7.7891,
+          "min_usage_mb": 7.6992,
+          "p95_usage_mb": 7.7836
+        }
+      }
+    },
+    {
+      "pod_name": "adservice-76b9bdbf58-dx8bm",
+      "container_name": "server",
+      "metrics": {
+        "cpu": {
+          "avg_utilization_pct": 0.9547,
+          "max_utilization_pct": 1.2058,
+          "min_utilization_pct": 0.5782,
+          "p95_utilization_pct": 1.1932,
+          "p99_utilization_pct": 1.2033,
+          "std_dev": 0.332
+        },
+        "memory": {
+          "avg_usage_mb": 87.3945,
+          "max_usage_mb": 88.9023,
+          "min_usage_mb": 86.4648,
+          "p95_usage_mb": 88.6937
+        }
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "node_name": "gke-benchmark-gcp-in-benchmark-gcp-in-bc56850a-tsr7",
+      "metrics": {}
+    },
+    {
+      "node_name": "gke-benchmark-gcp-in-benchmark-gcp-in-bc56850a-3rh2",
+      "metrics": {}
+    },
+    {
+      "node_name": "gke-benchmark-gcp-in-benchmark-gcp-in-bc56850a-0j1l",
+      "metrics": {}
+    }
+  ],
+  "services": {},
+  "summary": {
+    "total_pods": 12,
+    "total_nodes": 3,
+    "total_services": 0,
+    "pod_cpu_stats": {
+      "mean": 0.5916,
+      "median": 0.498,
+      "max": 1.9447,
+      "min": 0.04
+    },
+    "pod_memory_stats": {
+      "mean_mb": 30.3483,
+      "median_mb": 22.5273,
+      "max_mb": 87.3945,
+      "min_mb": 5.1042
+    }
+  },
+  "collection_metadata": {
+    "start_time": "2026-02-14T04:33:01.877752",
+    "end_time": "2026-02-14T04:33:31.877837",
+    "duration_seconds": 30.000085,
+    "namespace": "default"
+  }
+}
