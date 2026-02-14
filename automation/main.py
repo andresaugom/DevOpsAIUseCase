@@ -236,6 +236,7 @@ class BenchmarkOrchestrator:
         try:
             logger.info("Step 1: Uninstalling Helm releases...")
             self.helm.uninstall_all()
+            self.helm._run_kubectl_command(['delete', 'pvc', '--all', '--all-namespaces'])
             logger.info("Helm releases uninstalled")
         except Exception as e:
             logger.error(f"Helm cleanup failed: {str(e)}")
@@ -381,14 +382,6 @@ def main():
     }
     
     orchestrator = BenchmarkOrchestrator(config)
-    
-    # Handle cleanup-only mode
-    if args.cleanup_only:
-        orchestrator.cleanup()
-        return 0
-    
-    # Run the pipeline
-    result = orchestrator.run_full_pipeline()
     
     try:
         # Handle cleanup-only mode
